@@ -41,7 +41,9 @@ AjaxSolr.AbstractManager = AjaxSolr.Class.extend(
       // The parameter store for the manager and its widgets.
       store: null,
       // Whether <tt>init()</tt> has been called yet.
-      initialized: false
+      initialized: false,
+      // detect out of order responses
+      requestSerial: 0
     }, attributes);
   },
 
@@ -138,11 +140,11 @@ AjaxSolr.AbstractManager = AjaxSolr.Class.extend(
    *
    * @param {Object} data The Solr response.
    */
-  handleResponse: function (data) {
+  handleResponse: function (data, reqSerial) {
     this.response = data;
 
     for (var widgetId in this.widgets) {
-      this.widgets[widgetId].afterRequest();
+      this.widgets[widgetId].afterRequest(data, reqSerial);
     }
   },
 

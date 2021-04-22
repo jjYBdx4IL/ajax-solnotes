@@ -74,7 +74,8 @@ AjaxSolr.AbstractTextWidget = AjaxSolr.AbstractWidget.extend(
    *
    * @param {String} value The current main Solr query.
    */
-  afterChangeSelection: function (value) {},
+  afterChangeSelection: function (value) {
+  },
 
   /**
    * Returns a function to unset the main Solr query.
