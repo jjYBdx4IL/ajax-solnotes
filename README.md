@@ -58,7 +58,6 @@
   
 ## TODO
 
-* scan only repo/.
 * implement note editing.
 * improve GUI display.
 * support subversion:
@@ -72,3 +71,9 @@
 * Rakefile/javascript compression
 * support large note repositories by adding an incremental initial sync mechanism?
 * Allow Solr search queries? Probably not. One can use the Solr administration frontend for that purpose.
+
+## DONE
+
+* scan only repo/.
+* Simple CI test.
+

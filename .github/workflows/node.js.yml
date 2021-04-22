@@ -16,36 +16,46 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x, 15.x]
+        node-version: [14.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
+    - uses: actions/checkout@v2
+    # https://github.com/marketplace/actions/cache
+    - name: Cache stuff
+      id: cache-stuff
+      uses: actions/cache@v2
+      if: always()
+      with:
+        path: |
+          ./cache
+        key: ${{ runner.os }}-stuff
     # https://github.com/marketplace/actions/setup-java-jdk
     - uses: actions/setup-java@v2
       with:
         distribution: 'zulu' # See 'Supported distributions' for available options
         java-version: '11'        
-    - uses: actions/checkout@v2
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v2
       with:
         node-version: ${{ matrix.node-version }}
-    # https://github.com/marketplace/actions/cache
-    - name: Cache stuff
-      id: cache-stuff
-      uses: actions/cache@v2
-      with:
-        path: |
-          node_modules
-          cache
-        key: ${{ runner.os }}-stuff
     - run: install -d cache
-    - run: if ! test -e cache/solr.tgz; then wget -O cache/solr.tgz https://archive.apache.org/dist/lucene/solr/7.7.3/solr-7.7.3.tgz; fi
+    - run: if ! test -e cache/solr.tgz; then wget -O cache/solr.tgz https://archive.apache.org/dist/lucene/solr/8.8.2/solr-8.8.2.tgz; fi
     - run: install -d solr
     - run: tar xzf cache/solr.tgz --strip-components=1 -C solr
-    - run: cd solr/bin && ./solr start && sleep 10 && ./solr create_collection -c notes || ls -l
+    - run: sed -i solr/server/etc/jetty.xml -e 's:X-Content-Type-Options:X-GTFO:'
+    - run: sed -i solr/server/etc/jetty.xml -e 's:X-:X-GTFO-:g'
+    - run: grep X- solr/server/etc/jetty.xml
+    - run: cd solr/bin && ./solr --help start && ./solr create_collection -c notes || ls -l
+#    - run: curl "http://localhost:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
+    - run: curl "http://127.0.0.1:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
     - run: npm install
-    - run: npm ci
-    - run: npm run build --if-present
-    - run: npm test
+    - run: npm run ci
+#    - run: curl "http://localhost:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
+    - run: curl "http://127.0.0.1:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=0"
+      if: always()
+    - run: cat solr/server/logs/*
+      if: always()
+ #   - run: npm run build --if-present
+ #   - run: npm test
 

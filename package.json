@@ -2,15 +2,21 @@
   "name": "solrnote",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "server.js",
   "dependencies": {
     "findit": "^2.0.0",
     "solr-client": "^0.8.0",
     "yargs": "^16.2.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "got": "^11.8.2",
+    "jsdom": "^16.5.3",
+    "start-server-and-test": "^1.12.1"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start-server": "npm start -r",
+    "test": "node test.js",
+    "ci": "start-server-and-test start-server http://127.0.0.1:3000/ test"
   },
   "author": "",
   "license": "ISC"

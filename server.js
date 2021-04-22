@@ -61,15 +61,17 @@ const client = solr.createClient({core : 'notes'});
 if (argv.reset) {
     client.deleteAll();
     client.commit();
+    console.log("Index resetted.");
 }
 
 // recurse and add documents to the index
 var rootpath = process.cwd();
-var finder = find(rootpath);
+var repoRoot = path.join(rootpath, "repo");
+var finder = find(repoRoot);
 var submittedFiles = 0;
 finder.on('file', function (file, stat) {
     // use relative url-ized path as id
-    var normPath = path.normalize(path.relative(rootpath, file)).replace(/\\/g, "/");
+    var normPath = path.normalize(path.relative(repoRoot, file)).replace(/\\/g, "/");
     if (path.basename(file).startsWith(".") || stat.size > maxFileSize) {
         if(argv.verbose)
             console.log("skipping: " + normPath);
@@ -80,7 +82,7 @@ finder.on('file', function (file, stat) {
     submittedFiles++;
 });
 finder.on('directory', function (dir, stat, stop) {
-    var normPath = path.normalize(path.relative(rootpath, dir)).replace(/\\/g, "/");
+    var normPath = path.normalize(path.relative(repoRoot, dir)).replace(/\\/g, "/");
     if (path.basename(dir).startsWith(".")) {
         if(argv.verbose)
             console.log("skipping: " + normPath);
@@ -95,7 +97,6 @@ function serverHandler(request, response) {
     if (filePath == './')
         filePath = './index.html';
 
-    console.log(filePath);
     var extname = path.extname(filePath);
     var contentType = 'text/html';
     switch (extname) {
@@ -127,19 +128,13 @@ function serverHandler(request, response) {
 
     fs.readFile(filePath, function(error, content) {
         if (error) {
-            if(error.code == 'ENOENT'){
-                fs.readFile('./404.html', function(error, content) {
-                    response.writeHead(404, { 'Content-Type': contentType });
-                    response.end(content, 'utf-8');
-                });
-            }
-            else {
-                response.writeHead(500);
-                response.end('Sorry, check with the site admin for error: '+error.code+' ..\n');
-                response.end(); 
-            }
+            console.log("404 " + filePath + " (" + error + ")");
+            response.writeHead(404);
+            response.end('File not found.\n');
+            response.end(); 
         }
         else {
+            console.log("200 " + filePath + " (" + content.byteLength + ")");
             response.writeHead(200, { 'Content-Type': contentType });
             response.end(content, 'utf-8');
         }
