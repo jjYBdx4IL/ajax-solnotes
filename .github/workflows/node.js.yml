@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [14.x, 15.x]
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
@@ -44,18 +44,13 @@ jobs:
     - run: install -d solr
     - run: tar xzf cache/solr.tgz --strip-components=1 -C solr
     - run: sed -i solr/server/etc/jetty.xml -e 's:X-Content-Type-Options:X-GTFO:'
-    - run: sed -i solr/server/etc/jetty.xml -e 's:X-:X-GTFO-:g'
     - run: grep X- solr/server/etc/jetty.xml
-    - run: cd solr/bin && ./solr --help start && ./solr create_collection -c notes || ls -l
-#    - run: curl "http://localhost:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
+    - run: cd solr/bin && ./solr start && ./solr create_core -c notes || ls -l
     - run: curl "http://127.0.0.1:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
     - run: npm install
     - run: npm run ci
-#    - run: curl "http://localhost:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
     - run: curl "http://127.0.0.1:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=0"
       if: always()
     - run: cat solr/server/logs/*
       if: always()
- #   - run: npm run build --if-present
- #   - run: npm test
 

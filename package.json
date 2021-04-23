@@ -4,7 +4,9 @@
   "description": "",
   "main": "server.js",
   "dependencies": {
+    "es6-promise-pool": "^2.5.0",
     "findit": "^2.0.0",
+    "glob": "^7.1.6",
     "solr-client": "^0.8.0",
     "yargs": "^16.2.0"
   },

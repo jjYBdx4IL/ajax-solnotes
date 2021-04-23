@@ -9,7 +9,7 @@
   * Subdirs are allowed.
   * Everything starting with a dot ('.') is ignored, incl. directories. All files larger than 1 MB are being ignored, too. Links are *not* followed.
 * Uses [Solr](https://solr.apache.org/) for *live search*. Beware: Solr is a bit of bloatware, but it's also doing everything we need. If you find a leaner substring indexer, you are welcome to add the backend support for it.
-* [Node.js](https://nodejs.org/) server script feeds the Solr indexer at startup with all files currently in the repository. It also submits to solr every update it writes to that repository and keeps it up-to-date.
+* [Node.js](https://nodejs.org/) server script feeds the Solr indexer at startup (using [solr-client](https://github.com/lbdremy/solr-node-client#readme)) with all files currently in the repository. It also submits to solr every update it writes to that repository and keeps it up-to-date.
 * The [jQuery/Ajax client](https://jquery.com/) directly talks to Solr to get live search results. Only writes (note updates/deletions) go to the Node.js server. The jQuery/Ajax client's files are also served through the Node.js server.
 * Supported query syntax:
   * all search terms are combined using logical *AND*.
@@ -33,7 +33,6 @@
 
 ## Installation
 
-* Generate the favicon (optional, needs imagemagick 7 - available via Cygwin on Windows 10): `magick -background transparent "favicon.svg" -define icon:auto-resize=16,24,32,48,64,72,96,128,256 favicon.ico`
 * Node.js server:
   * `node server.js [-h]`
   * Alternatively, for development:
@@ -43,8 +42,8 @@
   * If all went right, the frontend should be accessible at http://localhost:3000 now.
 * [Solr 8](https://solr.apache.org/downloads.html):
   * Remove `X-Content-Type-Options` section from jetty.xml (but be aware of the consequences depending on your use case)
-  * `solr.cmd create_collection -c notes`
-  * `solr.cmd start`
+  * `solr[.cmd] start`
+  * `solr[.cmd] create_core -c notes`
   * You can start solr automatically at login by:
      * Using docker (?).
      * Using [Cygwin](https://www.cygwin.com/) screen package (Windows 10):
@@ -55,7 +54,13 @@
        * Optionally, set the link's properties to start the window minimized (it will only show for a second anyways).
        * You can check the server by starting the Cygwin command line (ie. bash), then enter `screen -r` to attach to the solr console. Press `ctrl-a, d` to detach and leave it alone. Use `screen -ls` to show a list of running screen sessions.
        * The administrative frontend should be running at http://localhost:8983 now.
-  
+* Optional: generate the favicon (optional, needs [ImageMagick 7](https://imagemagick.org/index.php) - available via Cygwin on Windows 10): `magick -background transparent "favicon.svg" -define icon:auto-resize=16,24,32,48,64,72,96,128,256 favicon.ico`
+
+## Continuous Integration
+
+* See Github workflow.
+* `npm run ci` (needs a running `notes` core -- see *Installation*)
+
 ## TODO
 
 * implement note editing.
@@ -66,11 +71,9 @@
 
 ## MAYDO
 
-* travis
 * add node.js server to solr-autostart.cmd?
 * Rakefile/javascript compression
 * support large note repositories by adding an incremental initial sync mechanism?
-* Allow Solr search queries? Probably not. One can use the Solr administration frontend for that purpose.
 
 ## DONE
 

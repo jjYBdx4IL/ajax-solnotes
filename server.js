@@ -1,5 +1,3 @@
-// npm install solr-client --save
-//   + findit
 // start with 'node server.js [-h]'
 // (or with auto-restart on source changes: npm install nodemon -g; nodemon server.js)
 //
@@ -13,16 +11,16 @@
 //
 // curl "http://localhost:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
 //
-// Works with solr 8.8. Run "solr.cmd create_collection -c notes" and follow
-// instructions in solr-autostart.cmd.
+const os = require('os');
 const http = require('http');
 var fs = require('fs');
 var path = require('path');
 var _url = require('url');
 var qs = require('querystring');
-var find = require('findit');
+var glob = require("glob")
 const solr = require('solr-client');
 const yargs = require('yargs');
+var PromisePool = require('es6-promise-pool');
 
 // https://nodejs.org/en/knowledge/command-line/how-to-parse-command-line-arguments/
 const argv = yargs
@@ -54,7 +52,7 @@ const maxFileSize = 1024 * 1024;
 const hostname = '127.0.0.1';
 const port = argv.port || 3000;
 
-// Create a client (collection ("core") name: "notes"; create with: "solr.cmd create_collection -c notes").
+// Create a client (collection ("core") name: "notes"; create with: "solr.cmd create_core -c notes").
 // Expects solr at localhost:8983.
 const client = solr.createClient({core : 'notes'});
 
@@ -64,32 +62,53 @@ if (argv.reset) {
     console.log("Index resetted.");
 }
 
-// recurse and add documents to the index
+// recurse repo/ dir and find files to add to the index
 var rootpath = process.cwd();
 var repoRoot = path.join(rootpath, "repo");
-var finder = find(repoRoot);
-var submittedFiles = 0;
-finder.on('file', function (file, stat) {
-    // use relative url-ized path as id
-    var normPath = path.normalize(path.relative(repoRoot, file)).replace(/\\/g, "/");
-    if (path.basename(file).startsWith(".") || stat.size > maxFileSize) {
-        if(argv.verbose)
-            console.log("skipping: " + normPath);
-        return;
-    }
-    var content = fs.readFileSync(file);
-    client.add({ id : normPath, lmod_dt : stat.mtime, text : content.toString()});
-    submittedFiles++;
-});
-finder.on('directory', function (dir, stat, stop) {
-    var normPath = path.normalize(path.relative(repoRoot, dir)).replace(/\\/g, "/");
-    if (path.basename(dir).startsWith(".")) {
-        if(argv.verbose)
-            console.log("skipping: " + normPath);
-        stop();
-    }
-});
+var filelist = glob.sync('**', {cwd: repoRoot, follow: false, nodir: true});
 
+// remove too large files
+var _filelist = [];
+for (var i=0; i<filelist.length; i++) {
+    var fn = filelist[i];
+    var stat = fs.statSync(path.join(repoRoot, fn));
+    if (!stat) {
+        throw Error("stat failed for " + fn);
+    }
+    if(stat.size <= maxFileSize) {
+        _filelist.push(fn);
+    }
+}
+filelist = _filelist;
+
+// use work queues to limit the number of concurrent index submissions
+var submitToIndex = function (filenameId) {
+    return new Promise(function (resolve, reject) {
+        if(argv.verbose)
+            console.log("adding to index: " + filenameId);
+        // use relative url-ized path as id
+        var content = fs.readFileSync(path.join(repoRoot, filenameId));
+        client.add({ id : filenameId, text : content.toString()}, function(err,obj){
+            if(err) {
+                throw Error(err);
+            } else {
+                resolve(filenameId);
+            }
+        });
+    })
+  }
+
+var filelistIndex = 0;
+var promiseProducer = function () {
+  if (filelistIndex < filelist.length) {
+    return submitToIndex(filelist[filelistIndex++])
+  } else {
+    return null
+  }
+}
+var pool = new PromisePool(promiseProducer, os.cpus().length);
+
+// a simple server implementation
 function serverHandler(request, response) {
     var url = new URL(request.url, 'http://xyz');
 
@@ -141,13 +160,20 @@ function serverHandler(request, response) {
     });
 };
 
-finder.on('end', function () {
-    client.commit();
-    console.log("Added " + submittedFiles + " files to the index.");
-    const server = http.createServer(serverHandler);
-    server.listen(port, hostname, () => {
-        console.log(`Server running at http://${hostname}:${port}/`);
-    });
-});
-
+// start submitting the notes to the index
 console.log("Indexing...");
+pool.start()
+  .then(function () {
+    // make sure the changes to the index are made visible ...
+    client.commit(function() {
+        console.log("Added " + filelist.length + " files to the index.");
+        filelist = null;
+        // ... before finally starting the server port
+        const server = http.createServer(serverHandler);
+        server.listen(port, hostname, () => {
+            console.log(`Server running at http://${hostname}:${port}/`);
+        });
+    });
+  });
+
+
