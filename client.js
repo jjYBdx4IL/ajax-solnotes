@@ -1,5 +1,142 @@
 var Manager;
 
+//
+// Utility functions
+//
+jQuery.fn.centerOnScreen = function (centerHorizontally=true, centerVertically=true) {
+  this.css("position","fixed");
+  if(centerHorizontally)
+    this.css("left", Math.max(0, (($(window).width() - $(this).outerWidth()) / 2) + 
+                                              $(window).scrollLeft()) + "px");
+  if(centerVertically)
+    this.css("top", Math.max(0, (($(window).height() - $(this).outerHeight()) / 2) + 
+                                          $(window).scrollTop()) + "px");
+  return this;
+}
+
+//
+// Status display
+//
+var clearStatusTimer = null;
+function updateStatus(msg, duration=5) {
+  var el = $("#status");
+  el.html(he.encode(msg));
+  el.css({visibility: "visible"});
+  el.centerOnScreen(true, false);
+  if (clearStatusTimer !== null) {
+    clearTimeout(clearStatusTimer);
+    clearStatusTimer = null;
+  }
+  if (duration > 0) {
+    clearStatusTimer = setTimeout(function() {
+      el.css({visibility: "hidden"});
+      clearStatusTimer = null;
+    }, duration * 1000);
+  }
+}
+
+//
+// Note editor
+//
+function getEditorTextElement() {
+  return $("#editor .textcontent");
+}
+function editorHasUnsavedContent() {
+  var val = getEditorTextElement().text().trim();
+  return val.length != 0;
+}
+var xhrSaveRequest = null;
+var editNoteId = null;
+var isDirty = false;
+getEditorTextElement().on('input', function() {
+  isDirty = true;
+});
+function cvtToPlainText(htmlNote) {
+  var text = htmlNote.replaceAll(/<\/?div>/g, '');
+  text = text.replaceAll(/<br>/g, '\n');
+  // did we miss a tag?
+  if (text.match(/[<>]/)) {
+    console.log("conversion to plaintext failed");
+    return null;
+  }
+  text = he.decode(text);
+  return text;
+}
+function saveNote() {
+  if (xhrSaveRequest !== null) return;
+  var plainText = cvtToPlainText(getEditorTextElement().html());
+  if (plainText === null) {
+    updateStatus("conversion to plain text format failed");
+    return;
+  }
+  var options = {
+    url: $(location).attr("href"),
+    contentType: 'application/json',
+    data: JSON.stringify({content: plainText, id: editNoteId}),
+    type: 'POST'
+  };
+  //console.log("ajax options: ", options);
+  xhrSaveRequest = jQuery.ajax(options);
+  xhrSaveRequest.done(function(data){
+    console.log("saved");
+    getEditorTextElement().html("");
+    isDirty = false;
+    toggleModal(false);
+  });
+  xhrSaveRequest.fail(function (jqXHR, textStatus, errorThrown) {
+    isDirty = true;
+    console.log(textStatus + ', ' + errorThrown, jqXHR.responseText);
+    var res = JSON.parse(jqXHR.responseText);
+    updateStatus(res.error);
+    if (editNoteId === null) {
+      if (res.noteId === void 0 || !res.noteId) {
+        throw Error("response did not contain any note id");
+      }
+      editNoteId = res.noteId;
+    }
+  });
+  xhrSaveRequest.always(function (){
+    xhrSaveRequest = null;
+  });
+}
+
+//
+// Modal editor toggling
+//
+function toggleModal(state) {
+  //console.log("toggleModal: " + state);
+  if (state) {
+    isDirty = false;
+    $("#search").attr("tabindex", -1);
+    $(".modal").css({visibility: "visible"});
+    $("#editor").css({visibility: "visible"});
+    $("#editor .textcontent").focus();
+  } else {
+    // TODO: fix race between save and further edits (goal: reliable background saves)
+    if(isDirty) {
+      saveNote();
+      return;
+    }
+    $("#search").attr("tabindex", 0);
+    $("#search").focus();
+    $(".modal").css({visibility: "hidden"});
+    $("#editor").css({visibility: "hidden"});
+  }
+};
+$("#addnote").on("click", function(){toggleModal(1)});
+$(".modal").on("click", function(){toggleModal(0)});
+$(document).on('keydown', function(event) {
+  if (event.key == "Escape") {
+    toggleModal($("#search").attr("tabindex") == 0);
+  }
+});
+//toggleModal(1);
+
+
+
+
+
+
 require.config({
   paths: {
     core: 'core',
@@ -32,16 +169,6 @@ define([
         resultWidget: resultWidget,
       }));
     Manager.addWidget(resultWidget);
-    // Manager.addWidget(new AjaxSolr.PagerWidget({
-    //   id: 'pager',
-    //   target: '#pager',
-    //   prevLabel: '&lt;',
-    //   nextLabel: '&gt;',
-    //   innerWindow: 1,
-    //   renderHeader: function (perPage, offset, total) {
-    //     $('#pager-header').html($('<span></span>').text('displaying ' + Math.min(total, offset + 1) + ' to ' + Math.min(total, offset + perPage) + ' of ' + total));
-    //   }
-    // }));
     Manager.init();
     var params = {
       'json.nl': 'map',

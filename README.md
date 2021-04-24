@@ -1,6 +1,11 @@
 
 ### Simple Note-Keeping With Live-Search and Text Files Backend
 
+## Functional Status
+
+* Implemented: live-search, add note.
+* tbd: edit note, make links accessible.
+
 ## Overview
 
 * Intended as an alternative to Google Keep, one that can be run locally and integrates nicely with version control systems (ie. operates only on simple text files, which can then be exported, converted, grepped at will).
@@ -63,9 +68,8 @@
 
 * implement note editing.
 * improve GUI display.
-* support subversion:
-  * rename only files that haven't been added to the repository yet. (svn status yields `? ...`).
-* Use first line of each note to determine its filename.
+* add creation/last-modified dates to notes and sort search results by last-modified.
+* refresh search results on leaving the editor
 
 ## MAYDO
 

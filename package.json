@@ -6,9 +6,8 @@
   "dependencies": {
     "es6-promise-pool": "^2.5.0",
     "express": "^4.17.1",
-    "express-logger": "0.0.3",
-    "findit": "^2.0.0",
     "glob": "^7.1.6",
+    "morgan": "^1.10.0",
     "solr-client": "^0.8.0",
     "yargs": "^16.2.0"
   },
@@ -17,7 +16,6 @@
     "got": "^11.8.2",
     "jsdom": "^16.5.3",
     "livereload": "^0.9.3",
-    "morgan": "^1.10.0",
     "start-server-and-test": "^1.12.1"
   },
   "scripts": {
