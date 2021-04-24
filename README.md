@@ -21,12 +21,10 @@
 * Simple text files as backend. No structuring whatsoever. First line of each note is the informal title and storage filename.
 * No tag cloud. Tag notes by adding keywords at the end.
 
-## Changes
+## Changes & Remarks
 
 * This project has been derived in large parts from [Ajax Solr](https://github.com/evolvingweb/ajax-solr).
-* Added handling (possibility to skip) of out-of-order responses. Due to the nature of async requests, responses can come in out of order. And we certainly do not want to overwrite a current result with outdated ones from a previous request. For that purpose, there have been two changes applied:
-  * the introduction of a monotonically increasing requestSerial (incremented before starting the async request in the doRequest function), which will be returned in the afterRequest call.
-  * The afterRequest call now also returns the response data instance. Storing the response data in the manager object (as it was done previously) introduces out-of-order violations. Together with the requestSerial, each module now has the ability to decide on its own what to do with stale responses.
+* Out-of-order responses are prevented by calling abort() (`AbstractManager::cancelAllRequests()`)on all open async requests when the user issues a new live-search request (ie. changes the search field). Also, the result display update timer gets cancelled (`ResultWidget::disableUntilNextResponse()`).
 * Everything that's not needed has been stripped out.
 * Updated external JavaScript assets to the current stable version (jQuery/UI, RequireJS).
 * CSS supports browser dark mode.

@@ -5,7 +5,7 @@ require.config({
     core: 'core',
     widgets: 'widgets'
   },
-  urlArgs: "bust=" +  (new Date()).getTime()
+  //urlArgs: "bust=" +  (new Date()).getTime()
 });
 
 (function ($) {
@@ -17,18 +17,21 @@ define([
   'widgets/ResultWidget',
 ], function () {
   $(function () {
+
     Manager = new AjaxSolr.Manager({
       solrUrl: 'http://localhost:8983/solr/notes/',
       solrContentFieldName: 'text'
     });
+    var resultWidget = new AjaxSolr.ResultWidget({
+      id: 'result',
+      target: '#docs',
+    }); 
     Manager.addWidget(new AjaxSolr.LiveSearchWidget({
         id: 'text2',
-        target: '#search'
+        target: '#search',
+        resultWidget: resultWidget,
       }));
-    Manager.addWidget(new AjaxSolr.ResultWidget({
-      id: 'result',
-      target: '#docs'
-    }));
+    Manager.addWidget(resultWidget);
     // Manager.addWidget(new AjaxSolr.PagerWidget({
     //   id: 'pager',
     //   target: '#pager',
@@ -42,7 +45,7 @@ define([
     Manager.init();
     var params = {
       'json.nl': 'map',
-      'rows': '10',
+      'rows': '25',
       'q': Manager.solrContentFieldName + ':*'
     };
     for (var name in params) {

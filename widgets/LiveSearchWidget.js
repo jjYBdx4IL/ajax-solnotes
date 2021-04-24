@@ -23,7 +23,8 @@ AjaxSolr.LiveSearchWidget = AjaxSolr.AbstractTextWidget.extend({
       start: undefined,
       servlet: undefined,
       // A reference to the widget's manager.
-      manager: null
+      manager: null,
+      resultWidget: null,
     }, attributes);
   },
 
@@ -57,6 +58,10 @@ AjaxSolr.LiveSearchWidget = AjaxSolr.AbstractTextWidget.extend({
       }
       // always use logical AND to combine the substring matches
       if (values.length && self.set(values.join(' AND '))) {
+        self.manager.store.get("start").val("0");
+        // this saves us A LOT of synchronization headaches because it prevents all out-of-order replies
+        self.manager.cancelAllRequests();
+        self.resultWidget.disableUntilNextResponse();
         self.doRequest();
       }
     });
@@ -66,3 +71,23 @@ AjaxSolr.LiveSearchWidget = AjaxSolr.AbstractTextWidget.extend({
 })(jQuery);
 
 }));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

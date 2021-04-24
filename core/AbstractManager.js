@@ -42,8 +42,8 @@ AjaxSolr.AbstractManager = AjaxSolr.Class.extend(
       store: null,
       // Whether <tt>init()</tt> has been called yet.
       initialized: false,
-      // detect out of order responses
-      requestSerial: 0
+      // remember requests so we can cancel them
+      requests: [],
     }, attributes);
   },
 
@@ -113,7 +113,10 @@ AjaxSolr.AbstractManager = AjaxSolr.Class.extend(
       this.widgets[widgetId].beforeRequest();
     }
 
-    this.executeRequest(servlet);
+    var xhr = this.executeRequest(servlet);
+    this.requests.push(xhr);
+    var self = this;
+    xhr.always(function() {self.requests = self.requests.filter(x => x !== xhr);});
   },
 
   /**
@@ -140,11 +143,11 @@ AjaxSolr.AbstractManager = AjaxSolr.Class.extend(
    *
    * @param {Object} data The Solr response.
    */
-  handleResponse: function (data, reqSerial) {
+  handleResponse: function (data) {
     this.response = data;
 
     for (var widgetId in this.widgets) {
-      this.widgets[widgetId].afterRequest(data, reqSerial);
+      this.widgets[widgetId].afterRequest();
     }
   },
 
@@ -155,6 +158,13 @@ AjaxSolr.AbstractManager = AjaxSolr.Class.extend(
    */
   handleError: function (message) {
     window.console && console.log && console.log(message);
+  },
+
+  cancelAllRequests: function() {
+    for(var i=0; i<this.requests.length; i++) {
+      this.requests[i].abort();
+    }
+    this.requests = [];
   }
 });
 
