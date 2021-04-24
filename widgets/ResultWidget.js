@@ -38,7 +38,9 @@ AjaxSolr.ResultWidget = AjaxSolr.AbstractWidget.extend({
     for (var i = 0, l = res.response.docs.length; i < l; i++) {
       var doc = res.response.docs[i];
       if (doc.text !== void 0 && doc.text.length > 0) {
-        this.append($(this.template(doc.text[0])));
+        var notePreview = $(this.template(doc.text[0])); // .grid-item
+        notePreview.attr("note-id", doc.id);
+        this.append(notePreview);
       }
     }
     

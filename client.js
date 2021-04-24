@@ -13,6 +13,15 @@ jQuery.fn.centerOnScreen = function (centerHorizontally=true, centerVertically=t
                                           $(window).scrollTop()) + "px");
   return this;
 }
+function makeid(length) {
+  var result           = [];
+  var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  var charactersLength = characters.length;
+  for ( var i = 0; i < length; i++ ) {
+    result.push(characters.charAt(Math.floor(Math.random() * charactersLength)));
+  }
+  return result.join('');
+}
 
 //
 // Status display
@@ -47,6 +56,7 @@ function editorHasUnsavedContent() {
 }
 var xhrSaveRequest = null;
 var editNoteId = null;
+var createNoteSessionId = '';
 var isDirty = false;
 getEditorTextElement().on('input', function() {
   isDirty = true;
@@ -72,9 +82,14 @@ function saveNote() {
   var options = {
     url: $(location).attr("href"),
     contentType: 'application/json',
-    data: JSON.stringify({content: plainText, id: editNoteId}),
+    data: JSON.stringify({note: {text: plainText, id: editNoteId}}),
     type: 'POST'
   };
+  if (editNoteId !== null) {
+    options.url += "u/";
+  } else {
+    options.url += "c/" + createNoteSessionId;
+  }
   //console.log("ajax options: ", options);
   xhrSaveRequest = jQuery.ajax(options);
   xhrSaveRequest.done(function(data){
@@ -82,6 +97,7 @@ function saveNote() {
     getEditorTextElement().html("");
     isDirty = false;
     toggleModal(false);
+    Manager.doRequest();
   });
   xhrSaveRequest.fail(function (jqXHR, textStatus, errorThrown) {
     isDirty = true;
@@ -99,6 +115,28 @@ function saveNote() {
     xhrSaveRequest = null;
   });
 }
+function openEditor(noteId=null) {
+  if(isModal()) return;
+  if (noteId !== null) {
+    var res = JSON.parse($.ajax({
+      type: "GET",
+      url: $(location).attr("href") + "r/" + noteId,
+      async: false
+    }).responseText);
+    if (res.status != 0) {
+      updateStatus(res.error);
+      return;
+    }
+    $("#editor .textcontent").html(res.note.text);
+    createNoteSessionId = '';
+  } else {
+    $("#editor .textcontent").html("");
+    createNoteSessionId = makeid(20);
+  }
+  toggleModal(1);
+  editNoteId = noteId;
+  isDirty = false;
+}
 
 //
 // Modal editor toggling
@@ -107,7 +145,7 @@ function toggleModal(state) {
   //console.log("toggleModal: " + state);
   if (state) {
     isDirty = false;
-    $("#search").attr("tabindex", -1);
+    $("#query").attr("tabindex", -1);
     $(".modal").css({visibility: "visible"});
     $("#editor").css({visibility: "visible"});
     $("#editor .textcontent").focus();
@@ -117,22 +155,31 @@ function toggleModal(state) {
       saveNote();
       return;
     }
-    $("#search").attr("tabindex", 0);
-    $("#search").focus();
+    $("#query").attr("tabindex", 0);
+    $("#query").focus();
     $(".modal").css({visibility: "hidden"});
     $("#editor").css({visibility: "hidden"});
   }
 };
-$("#addnote").on("click", function(){toggleModal(1)});
+$("#addnote").on("click", function(){openEditor(null)});
 $(".modal").on("click", function(){toggleModal(0)});
+function isModal() {
+  return parseInt($("#query").attr("tabindex")) != 0;
+}
 $(document).on('keydown', function(event) {
   if (event.key == "Escape") {
-    toggleModal($("#search").attr("tabindex") == 0);
+    toggleModal(!isModal());
   }
 });
 //toggleModal(1);
 
-
+//
+// Grid interaction
+//
+$(".grid").on('click', function(evt) {
+  var notePreview = evt.target.closest('.grid-item');
+  openEditor($(notePreview).attr("note-id"));
+});
 
 
 

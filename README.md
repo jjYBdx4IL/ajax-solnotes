@@ -4,7 +4,7 @@
 ## Functional Status
 
 * Implemented: live-search, add note.
-* tbd: edit note, make links accessible.
+* tbd: edit note, make links accessible, delete note.
 
 ## Overview
 
@@ -63,6 +63,10 @@
 
 * See Github workflow.
 * `npm run ci` (needs a running `notes` core -- see *Installation*)
+
+## Development
+
+* `npm run dev`
 
 ## TODO
 

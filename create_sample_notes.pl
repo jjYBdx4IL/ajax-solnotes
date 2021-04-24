@@ -3,7 +3,11 @@
 use warnings;
 use strict;
 
+use POSIX qw(strftime);
 use File::Slurp qw(read_file write_file);
+
+my $now = time();
+my $t = strftime('%Y-%m-%dT%H:%M:%S.000Z', gmtime($now));
 
 my @files = glob("node_modules/**/*");
 my %words = ();
@@ -20,7 +24,7 @@ print "words: ", scalar @words, "\n";
 
 for (my $i = 0; $i < 10000; $i++) {
     my $totalLen = 40+rand()*rand()*2000;
-    my $output = "";
+    my $output = "Created: $t\n\n";
     while (length($output) < $totalLen) {
         if(length($output) > 0) {
             $output .= " ";
