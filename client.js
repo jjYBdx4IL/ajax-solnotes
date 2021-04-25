@@ -60,9 +60,19 @@ getEditorTextElement().on('input', function() {
     isDirty = true;
   }
 });
+// prevent browsers from inserting divs into contenteditable div
+// (otherwise we have a hard time to condense the html down into properly formatted plain text)
+document.addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    document.execCommand('insertLineBreak')
+    event.preventDefault()
+  }
+})
+function cvtToEditorHtml(text) {
+  return text.replace(/\r?\n/gs, '<br>');
+}
 function cvtToPlainText(htmlNote) {
-  var text = htmlNote.replaceAll(/<\/?div>/g, '');
-  text = text.replaceAll(/<br>/g, '\n');
+  var text = htmlNote.replaceAll(/<br>/g, '\n');
   // did we miss a tag?
   if (text.match(/[<>]/)) {
     console.log("conversion to plaintext failed");
@@ -127,7 +137,7 @@ function openEditor(noteId=null) {
       updateStatus(res.error);
       return;
     }
-    tc.html(res.note.text);
+    tc.html(cvtToEditorHtml(res.note.text));
     createNoteSessionId = '';
     $("#delete").show();
   } else {
@@ -201,7 +211,8 @@ $("#editor").on('keydown', function(event) {
     toggleModal(false);
   }
 });
-//openEditor(null);
+//openEditor("testnote");
+
 
 //
 // Grid interaction

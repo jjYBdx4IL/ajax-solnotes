@@ -46,7 +46,7 @@ AjaxSolr.ResultWidget = AjaxSolr.AbstractWidget.extend({
     
     // no more results?
     if (start + rows >= numFound) return;
-    
+
     var self = this;
     this.timer = setTimeout(function(){self.timedUpdate(self)}, 1000);
   },
