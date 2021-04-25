@@ -116,9 +116,9 @@ AjaxSolr.ResultWidget = AjaxSolr.AbstractWidget.extend({
   template: function (noteText) {
     var snippet = '';
     if (noteText.length > this.maxPreviewLength) {
-      snippet = $("<div>").text(noteText.substring(0,this.maxPreviewLength) + " ...").html();
+      snippet = urlify($("<div>").text(noteText.substring(0,this.maxPreviewLength) + " ...").html());
     } else {
-      snippet = $("<div>").text(noteText).html();
+      snippet = urlify($("<div>").text(noteText).html());
     }
     snippet = snippet.replaceAll(/\r?\n/g, "<br>");
     return '<div class="grid-item"><div class="grid-item-textcontent">' + snippet + '</div></div>';

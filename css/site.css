@@ -9,7 +9,12 @@ body {
   font-family: 'Roboto',arial,sans-serif;
   font-size: 15px;
 }
-.colorscheme {
+.link, a:link {
+  text-decoration: underline;
+  cursor: pointer;
+  display: inline;
+}
+a:link, a:visited, a:hover, a:active, .colorscheme {
   background-color: white;
   color: #555;
 }
@@ -17,7 +22,7 @@ body {
     body {
       background: url(../images/header_dark.gif) repeat-x;
     }
-    .colorscheme {
+    a:link, a:visited, a:hover, a:active, .colorscheme {
       background-color: #202124;
       color: #e8eaed;
     }
@@ -146,6 +151,7 @@ a:hover {
   opacity: 0.5;
   visibility:hidden;
 }
+
 
 /* right */
 
