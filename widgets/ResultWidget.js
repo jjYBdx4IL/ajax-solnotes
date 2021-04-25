@@ -44,6 +44,9 @@ AjaxSolr.ResultWidget = AjaxSolr.AbstractWidget.extend({
       }
     }
     
+    // no more results?
+    if (start + rows >= numFound) return;
+    
     var self = this;
     this.timer = setTimeout(function(){self.timedUpdate(self)}, 1000);
   },
@@ -56,6 +59,9 @@ AjaxSolr.ResultWidget = AjaxSolr.AbstractWidget.extend({
     var start = parseInt(res.response.start);
     var numFoundExact = res.response.numFoundExact;
 
+    // no more results?
+    if (start + rows >= numFound) return;
+
     // has the target width changed so much that we have a new column count?
     var ncols = Math.max(3, Math.floor($(self.target).width() / self.elw));
     if (ncols != self.colMaxY.length) {
@@ -64,9 +70,6 @@ AjaxSolr.ResultWidget = AjaxSolr.AbstractWidget.extend({
       self.doRequest();
       return;
     }
-
-    // no more results?
-    if (start + rows >= numFound) return;
 
     // no more space to display more results?
     var docHeight = $(document).height();

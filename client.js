@@ -166,9 +166,9 @@ $(".modal").on("click", function(){toggleModal(0)});
 function isModal() {
   return parseInt($("#query").attr("tabindex")) != 0;
 }
-$(document).on('keydown', function(event) {
+$("#editor").on('keydown', function(event) {
   if (event.key == "Escape") {
-    toggleModal(!isModal());
+    toggleModal(false);
   }
 });
 //toggleModal(1);
@@ -220,6 +220,7 @@ define([
     var params = {
       'json.nl': 'map',
       'rows': '25',
+      'sort': 'lmod_dt desc',
       'q': Manager.solrContentFieldName + ':*'
     };
     for (var name in params) {

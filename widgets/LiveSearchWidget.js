@@ -34,6 +34,7 @@ AjaxSolr.LiveSearchWidget = AjaxSolr.AbstractTextWidget.extend({
       // convert search expression to solr notation
       var values = $.trim($(this).val()).split(/\s+/);
       var maxLen = 0;
+      var newValues = [];
       for(var i=0; i<values.length; i++) {
         var value = values[i];
         var not = false;
@@ -41,17 +42,19 @@ AjaxSolr.LiveSearchWidget = AjaxSolr.AbstractTextWidget.extend({
           not = true;
           value = value.substr(1);
         }
-        if (value.length > maxLen)
-          maxLen = value.length;
+        maxLen = Math.max(maxLen, value.length);
+        // skip incomplete search expressions
+        if (!value.length) {
+          continue;
+        }
         value = value.replaceAll("\\", "\\\\");
         value = value.replaceAll("\"", "\\\"");
         value = value.replaceAll("*", "\\*");
         value = value.replaceAll("^", "\\^");
-        // skip incomplete search expressions
-        if (!value.length) return;
         // always do a substring match
-        values[i] = (not ? "NOT " : "") + self.manager.solrContentFieldName + ':*' + value + '*';
+        newValues.push((not ? "NOT " : "") + self.manager.solrContentFieldName + ':*' + value + '*');
       }
+      values = newValues;
       // ignore search term input until we have at least one term of length 3+
       if (maxLen < 3) {
         values = [self.manager.solrContentFieldName + ':*'];
