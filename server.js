@@ -22,27 +22,30 @@ const solr = require('solr-client');
 const yargs = require('yargs');
 var PromisePool = require('es6-promise-pool');
 const { notDeepEqual } = require('assert');
+const { exit } = require('process');
 
 const noteSuffix = ".txt";
 const repoRoot = path.join(__dirname, "repo");
 
 // https://nodejs.org/en/knowledge/command-line/how-to-parse-command-line-arguments/
 const argv = yargs
-    .command('port', 'server port', {
-        serverport: {
-            description: 'server port',
-            alias: 'p',
-            type: 'number',
-        }
+    .option('port', {
+        description: 'server port',
+        alias: 'p',
+        type: 'number',
     })
     .default('serverport', 3000)
-    .command('servername', 'address to bind the server to', {
-        servername: {
-            alias: 'n',
-            type: 'string'
-        }
+    .option('servername', {
+        description: 'address to bind the server to',
+        alias: 'n',
+        type: 'string'
     })
     .default('servername', '127.0.0.1')
+    .option('stopafterimport', {
+        alias: 'i',
+        description: 'do not start the server after pushing notes to the index',
+        type: 'boolean',
+    })
     .option('reset', {
         alias: 'r',
         description: 'rebuild the search index',
@@ -52,10 +55,9 @@ const argv = yargs
         description: 'skip index submission at start',
         type: 'boolean',
     })
-    .command('maxfilesize', 'maximum file size accepted during startup indexing run (in kb)', {
-        maxfilesize: {
-            type: 'number',
-        }
+    .option('maxfilesize', {
+        description: 'maximum file size accepted during startup indexing run (in kb)',
+        type: 'number',
     })
     .default('maxfilesize', 0, '(disabled)')
     .option('logging', {
@@ -75,7 +77,9 @@ const argv = yargs
     .alias('help', 'h')
     .argv;
 
-
+if (argv.stopafterimport && argv.skipimport) {
+    throw Error("cannot use --skipimport and --stopafterimport at the same time");
+}
 
 // Create a client (collection ("core") name: "notes"; create with: "solr.cmd create_core -c notes").
 // Expects solr at localhost:8983.
@@ -83,6 +87,9 @@ const client = solr.createClient({core : 'notes'});
 
 const app = express();
 function startApp() {
+    if (argv.stopafterimport) {
+        exit(0);
+    }
     app.listen(argv.serverport, argv.servername, () => {
         console.log(`Listening at http://${argv.servername}:${argv.serverport}`)
     })
@@ -342,7 +349,6 @@ app.param('sessionId', function (req, res, next, sessionId) {
     next()
 })
 app.post('/c/:sessionId', express.json(), function (req, res){  
-    console.log('req received: ', req.body);
     res.contentType = 'application/json';
     var reply = {status: 0, error: ''};
     var note = req.body.note;
@@ -402,7 +408,6 @@ app.post('/c/:sessionId', express.json(), function (req, res){
     res.send(JSON.stringify(reply)).end();
 });
 app.post('/u/', express.json(), function (req, res){  
-    console.log('req received: ', req.body);
     res.contentType = 'application/json';
     var reply = {status: 0, error: ''};
     var noteId = req.body.note.id;
@@ -451,31 +456,40 @@ app.post('/u/', express.json(), function (req, res){
     );
 });
 app.post('/d/:noteId', express.json(), function (req, res){  
-    console.log('req received: ', req.body);
     var noteId = res.locals.noteId;
     res.contentType = 'application/json';
     var reply = {status: 0, error: ''};
 
     var np = path.join(repoRoot, noteId);
-    client.deleteByID(noteId, function(err,res) {
+    client.deleteByID(noteId, function(err,solrRes) {
         if(err) {
-            console.log("index delete failed: ", err, res);
+            console.log("index delete failed: ", err, solrRes);
             reply.error = "index removal failed";
-        } else {
-            if (fs.existsSync(np)) {
-                try {
-                    fs.unlinkSync(np);
-                } catch (err2) {
-                    console.log("disk delete failed: ", err2);
-                    reply.error = "deletion failed";
-                }
-            }
-        }
-        if (reply.error) {
             reply.status = 1;
             res.status(500);
+            res.send(JSON.stringify(reply)).end();
+        } else {
+            client.softCommit(function(err2,solrRes2) {
+                if(err2) {
+                    console.log("index softCommit failed: ", err2, solrRes2);
+                    reply.error = "index softCommit failed";
+                } else {
+                    if (fs.existsSync(np)) {
+                        try {
+                            fs.unlinkSync(np);
+                        } catch (err3) {
+                            console.log("disk delete failed: ", err3);
+                            reply.error = "deletion failed";
+                        }
+                    }
+                }
+                if (reply.error) {
+                    reply.status = 1;
+                    res.status(500);
+                }
+                res.send(JSON.stringify(reply)).end();
+            });
         }
-        res.send(JSON.stringify(reply)).end();
     });
  });
  app.get('*', express.static(__dirname))

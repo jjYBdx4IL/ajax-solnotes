@@ -50,16 +50,15 @@ function updateStatus(msg, duration=5) {
 function getEditorTextElement() {
   return $("#editor .textcontent");
 }
-function editorHasUnsavedContent() {
-  var val = getEditorTextElement().text().trim();
-  return val.length != 0;
-}
 var xhrSaveRequest = null;
 var editNoteId = null;
 var createNoteSessionId = '';
 var isDirty = false;
 getEditorTextElement().on('input', function() {
-  isDirty = true;
+  if (!isDirty) {
+    $(".editbglabel").css({visibility: "hidden"});
+    isDirty = true;
+  }
 });
 function cvtToPlainText(htmlNote) {
   var text = htmlNote.replaceAll(/<\/?div>/g, '');
@@ -117,6 +116,7 @@ function saveNote() {
 }
 function openEditor(noteId=null) {
   if(isModal()) return;
+  var tc = $("#editor .textcontent");
   if (noteId !== null) {
     var res = JSON.parse($.ajax({
       type: "GET",
@@ -127,15 +127,31 @@ function openEditor(noteId=null) {
       updateStatus(res.error);
       return;
     }
-    $("#editor .textcontent").html(res.note.text);
+    tc.html(res.note.text);
     createNoteSessionId = '';
+    $("#delete").show();
   } else {
-    $("#editor .textcontent").html("");
+    tc.html("");
     createNoteSessionId = makeid(20);
+    $(".editbglabel").css({visibility: "visible"});
+    $("#delete").hide();
   }
   toggleModal(1);
   editNoteId = noteId;
   isDirty = false;
+}
+function deleteNote() {
+  if (editNoteId === null) return;
+  var res = JSON.parse($.ajax({
+    type: "POST",
+    url: $(location).attr("href") + "d/" + editNoteId,
+    async: false
+  }).responseText);
+  if (res.status != 0) {
+    updateStatus(res.error);
+    return false;
+  }
+  return true;
 }
 
 //
@@ -159,10 +175,24 @@ function toggleModal(state) {
     $("#query").focus();
     $(".modal").css({visibility: "hidden"});
     $("#editor").css({visibility: "hidden"});
+    $(".editbglabel").css({visibility: "hidden"});
   }
 };
 $("#addnote").on("click", function(){openEditor(null)});
 $(".modal").on("click", function(){toggleModal(0)});
+$("#cancel").on("click", function(){
+  isDirty = false;
+  toggleModal(0);
+});
+$("#delete").on("click", function(){
+  if(confirm('Really DELETE ERASE DESTROY VAPORIZE this note?')) {
+    if (deleteNote()) {
+      isDirty = false;
+      toggleModal(0);
+      Manager.doRequest();
+    }
+  }
+});
 function isModal() {
   return parseInt($("#query").attr("tabindex")) != 0;
 }
@@ -171,7 +201,7 @@ $("#editor").on('keydown', function(event) {
     toggleModal(false);
   }
 });
-//toggleModal(1);
+//openEditor(null);
 
 //
 // Grid interaction

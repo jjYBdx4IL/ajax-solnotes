@@ -3,8 +3,10 @@
 
 ## Functional Status
 
-* Implemented: live-search, add note.
-* tbd: edit note, make links accessible, delete note.
+* Implemented: live-search, CRUD note.
+* tbd:
+  * retain formatting in editor
+  * style
 
 ## Overview
 
@@ -67,22 +69,4 @@
 ## Development
 
 * `npm run dev`
-
-## TODO
-
-* implement note editing.
-* improve GUI display.
-* add creation/last-modified dates to notes and sort search results by last-modified.
-* refresh search results on leaving the editor
-
-## MAYDO
-
-* add node.js server to solr-autostart.cmd?
-* Rakefile/javascript compression
-* support large note repositories by adding an incremental initial sync mechanism?
-
-## DONE
-
-* scan only repo/.
-* Simple CI test.
 
