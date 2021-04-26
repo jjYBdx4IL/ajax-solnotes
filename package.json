@@ -8,22 +8,35 @@
     "express": "^4.17.1",
     "glob": "^7.1.6",
     "morgan": "^1.10.0",
+    "nunjucks": "^3.2.3",
     "solr-client": "^0.8.0",
     "yargs": "^16.2.0"
   },
   "devDependencies": {
+    "@types/bootstrap": "^5.0.12",
+    "@types/he": "^1.1.1",
+    "@types/jquery": "^3.5.5",
+    "@types/nunjucks": "^3.1.4",
+    "@types/requirejs": "^2.1.32",
+    "@types/uglify-js": "^3.13.0",
+    "@types/yargs": "^16.0.1",
     "connect-livereload": "^0.6.1",
     "got": "^11.8.2",
     "jsdom": "^16.5.3",
     "livereload": "^0.9.3",
-    "start-server-and-test": "^1.12.1"
+    "start-server-and-test": "^1.12.1",
+    "uglify-js": "^3.13.4",
+    "uglifycss": "^0.0.29"
   },
   "scripts": {
     "start-server": "npm start",
     "test": "node test.js",
     "ci": "start-server-and-test start-server http://127.0.0.1:3000/ test",
-    "dev": "nodemon -w server.js server.js --skipimport --logging --livereload"
+    "dev": "nodemon -w server.js server.js --skipimport --logging --livereload",
+    "prod": "node server.js --prod",
+    "minify": "node uglify.js"
   },
   "author": "",
+  "types": "check.d.ts",
   "license": "ISC"
 }

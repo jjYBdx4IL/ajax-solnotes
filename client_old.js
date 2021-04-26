@@ -3,16 +3,19 @@ var Manager;
 //
 // Utility functions
 //
-jQuery.fn.centerOnScreen = function (centerHorizontally=true, centerVertically=true) {
-  this.css("position","fixed");
-  if(centerHorizontally)
-    this.css("left", Math.max(0, (($(window).width() - $(this).outerWidth()) / 2) + 
-                                              $(window).scrollLeft()) + "px");
-  if(centerVertically)
-    this.css("top", Math.max(0, (($(window).height() - $(this).outerHeight()) / 2) + 
-                                          $(window).scrollTop()) + "px");
+$.fn.centerOnScreen = function (centerHorizontally = true, centerVertically = true) {
+  this.css("position", "fixed");
+  if (centerHorizontally)
+    this.css("left", Math.max(0, (($(window).width() - $(this).outerWidth()) / 2) +
+      $(window).scrollLeft()) + "px");
+  if (centerVertically)
+    this.css("top", Math.max(0, (($(window).height() - $(this).outerHeight()) / 2) +
+      $(window).scrollTop()) + "px");
   return this;
 }
+
+
+/** @param {number} length @returns {string} */
 function makeid(length) {
   var result           = [];
   var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -22,7 +25,8 @@ function makeid(length) {
   }
   return result.join('');
 }
-const urlifyRegex =  new RegExp("(((?:(http|https|Http|Https|rtsp|Rtsp):\\/\\/(?:(?:[a-zA-Z0-9\\$\\-\\_\\.\\+\\!\\*\\'\\(\\)"
+
+const urlifyRegex = new RegExp("(((?:(http|https|Http|Https|rtsp|Rtsp):\\/\\/(?:(?:[a-zA-Z0-9\\$\\-\\_\\.\\+\\!\\*\\'\\(\\)"
 + "\\,\\;\\?\\&\\=]|(?:\\%[a-fA-F0-9]{2})){1,64}(?:\\:(?:[a-zA-Z0-9\\$\\-\\_"
 + "\\.\\+\\!\\*\\'\\(\\)\\,\\;\\?\\&\\=]|(?:\\%[a-fA-F0-9]{2})){1,25})?\\@)?)?"
 + "((?:(?:[a-zA-Z0-9][a-zA-Z0-9\\-]{0,64}\\.)+"   // named host
@@ -61,11 +65,13 @@ const urlifyRegex =  new RegExp("(((?:(http|https|Http|Https|rtsp|Rtsp):\\/\\/(?
 + "(\\/(?:(?:[a-zA-Z0-9\\;\\/\\?\\:\\@\\&\\=\\#\\~"  // plus option query params
 + "\\-\\.\\+\\!\\*\\'\\(\\)\\,\\_])|(?:\\%[a-fA-F0-9]{2}))*)?"
 + "(?:\\b|$))", "g");  
+/** @param {string} text  @returns {string} */
 function urlify(text) {
   return text.replaceAll(urlifyRegex, '<div class="link">$1</a>');
 }
 //console.log("test:"+urlify("https://www.google.de http://www.bla.de"));
 const deurlifyRegex = new RegExp("<div class=\"link\">([^<>]+)</div>", "g");
+/** @param {string} text  @returns {string} */
 function deurlify(text) {
   return text.replaceAll(deurlifyRegex, '$1');
 }
@@ -74,11 +80,13 @@ function deurlify(text) {
 //
 // Status display
 //
+/** @type {NodeJS.Timeout} */
 var clearStatusTimer = null;
+/** @param {string} msg @returns {void} */
 function updateStatus(msg, duration=5) {
   var el = $("#status");
   el.html(he.encode(msg));
-  el.css({visibility: "visible"});
+  el.fadeIn();
   el.centerOnScreen(true, false);
   if (clearStatusTimer !== null) {
     clearTimeout(clearStatusTimer);
@@ -86,7 +94,7 @@ function updateStatus(msg, duration=5) {
   }
   if (duration > 0) {
     clearStatusTimer = setTimeout(function() {
-      el.css({visibility: "hidden"});
+      el.fadeOut();
       clearStatusTimer = null;
     }, duration * 1000);
   }
@@ -95,11 +103,13 @@ function updateStatus(msg, duration=5) {
 //
 // Note editor
 //
+///** @returns {JQuery<HTMLElement>} */
 function getEditorTextElement() {
   return $("#editor .textcontent");
 }
+///** @type {JQuery.jqXHR} */
 var xhrSaveRequest = null;
-var editNoteId = null;
+var editNoteId = '';
 var createNoteSessionId = '';
 var isDirty = false;
 getEditorTextElement().on('input', function() {
@@ -113,6 +123,7 @@ getEditorTextElement().on('click', function(evt) {
     window.open($(evt.target).text(), '_blank').focus();
   }
 });
+
 // prevent browsers from inserting divs into contenteditable div
 // (otherwise we have a hard time to condense the html down into properly formatted plain text)
 document.addEventListener('keydown', event => {
@@ -121,9 +132,13 @@ document.addEventListener('keydown', event => {
     event.preventDefault()
   }
 })
+
+/** @param {string} text  @returns {string} */
 function cvtToEditorHtml(text) {
   return urlify(text).replace(/\r?\n/gs, '<br>');
 }
+
+/** @param {string} htmlNote  @returns {string} */
 function cvtToPlainText(htmlNote) {
   var text = deurlify(htmlNote).replaceAll(/<br>/g, '\n');
   // did we miss a tag?
@@ -134,6 +149,8 @@ function cvtToPlainText(htmlNote) {
   text = he.decode(text);
   return text;
 }
+
+/** @returns {void} */
 function saveNote() {
   if (xhrSaveRequest !== null) return;
   var plainText = cvtToPlainText(getEditorTextElement().html());
@@ -147,7 +164,7 @@ function saveNote() {
     data: JSON.stringify({note: {text: plainText, id: editNoteId}}),
     type: 'POST'
   };
-  if (editNoteId !== null) {
+  if (editNoteId) {
     options.url += "u/";
   } else {
     options.url += "c/" + createNoteSessionId;
@@ -166,8 +183,8 @@ function saveNote() {
     console.log(textStatus + ', ' + errorThrown, jqXHR.responseText);
     var res = JSON.parse(jqXHR.responseText);
     updateStatus(res.error);
-    if (editNoteId === null) {
-      if (res.noteId === void 0 || !res.noteId) {
+    if (!editNoteId) {
+      if (!res.noteId) {
         throw Error("response did not contain any note id");
       }
       editNoteId = res.noteId;
@@ -199,12 +216,13 @@ function openEditor(noteId=null) {
     $(".editbglabel").css({visibility: "visible"});
     $("#delete").hide();
   }
-  toggleModal(1);
+  toggleModal(true);
   editNoteId = noteId;
   isDirty = false;
 }
+/** @returns {boolean} */
 function deleteNote() {
-  if (editNoteId === null) return;
+  if (!editNoteId) return;
   var res = JSON.parse($.ajax({
     type: "POST",
     url: $(location).attr("href") + "d/" + editNoteId,
@@ -220,6 +238,11 @@ function deleteNote() {
 //
 // Modal editor toggling
 //
+/**
+ * 
+ * @param {boolean} state 
+ * @returns {void}
+ */
 function toggleModal(state) {
   //console.log("toggleModal: " + state);
   if (state) {
@@ -242,16 +265,16 @@ function toggleModal(state) {
   }
 };
 $("#addnote").on("click", function(){openEditor(null)});
-$(".modal").on("click", function(){toggleModal(0)});
+$(".modal").on("click", function(){toggleModal(false)});
 $("#cancel").on("click", function(){
   isDirty = false;
-  toggleModal(0);
+  toggleModal(false);
 });
 $("#delete").on("click", function(){
   if(confirm('Really DELETE ERASE DESTROY VAPORIZE this note?')) {
     if (deleteNote()) {
       isDirty = false;
-      toggleModal(0);
+      toggleModal(false);
       Manager.doRequest();
     }
   }
@@ -278,6 +301,9 @@ $(".grid").on('click', function(evt) {
 
 
 
+
+
+//@ts-ignore
 require.config({
   paths: {
     core: 'core',
@@ -322,15 +348,6 @@ define([
     }
     Manager.doRequest();
   });
-
-  $.fn.showIf = function (condition) {
-    if (condition) {
-      return this.show();
-    }
-    else {
-      return this.hide();
-    }
-  }
 });
 
 })(jQuery);

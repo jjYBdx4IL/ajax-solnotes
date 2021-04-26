@@ -1,21 +1,35 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="utf-8">
   <title>AJAX SolNotes</title>
-  <link rel="stylesheet" href="css/site.css">
-  <!-- https://fonts.google.com/ -->
+  <link rel="stylesheet" href="site.css">
   <link rel="preconnect" href="https://fonts.gstatic.com">
-  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet"> 
-  <!-- https://fonts.google.com/icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-  <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
-  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/he/1.2.0/he.min.js" integrity="sha512-PEsccDx9jqX6Dh4wZDCnWMaIO3gAaU0j46W//sSqQhUQxky6/eHZyeB3NrXD2xsyugAKd4KPiDANkcuoEa2JuA==" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.AreYouSure/1.9.0/jquery.are-you-sure.min.js" integrity="sha512-YuZemcyQ8r4w8tdxIzkJVgWfHrzSQN9PuF18I490DE8H97DOkrt+bolBf3/mve+9t8SLWODBzFCCPxH/vZYqBg==" crossorigin="anonymous"></script>
-  <script data-main="client" src="http://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/he/1.2.0/he.min.js"
+    integrity="sha512-PEsccDx9jqX6Dh4wZDCnWMaIO3gAaU0j46W//sSqQhUQxky6/eHZyeB3NrXD2xsyugAKd4KPiDANkcuoEa2JuA=="
+    crossorigin="anonymous"></script>
+  {% if prod %}
+  <script src="__app__.js"></script>
+  {% else %}
+  <script src="__env_dev.js"></script>
+  <script src="utils.js"></script>
+  <script src="IServerResponse.js"></script>
+  <script src="ISolrSelectResponse.js"></script>
+  <script src="StatusDisplay.js"></script>
+  <script src="SolrClient.js"></script>
+  <script src="LiveSearchClient.js"></script>
+  <script src="Widget.js"></script>
+  <script src="LiveSearchWidget.js"></script>
+  <script src="ResultWidget.js"></script>
+  <script src="NoteEditor.js"></script>
+  <script src="client.js"></script>
+  {% endif %}
 </head>
+
 <body class="colorscheme">
 
 
@@ -42,7 +56,8 @@
     <div class="editbglabel">Take a note...</div>
     <div class="textcontent" contenteditable="true" aria-label="Take a note..." spellcheck="false" tabindex="0"></div>
     <div class="footer">
-      <div id="delete" class="button">Delete</div><div id="cancel" class="button">Cancel</div>
+      <div id="delete" class="button">Delete</div>
+      <div id="cancel" class="button">Cancel</div>
     </div>
     <div class="clear"></div>
   </div>
@@ -50,4 +65,5 @@
   <div id="status"></div>
 
 </body>
+
 </html>

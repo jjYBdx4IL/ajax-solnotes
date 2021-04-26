@@ -2,3 +2,6 @@ ajax-solr.min.js
 favicon.ico
 node_modules/
 package-lock.json
+workspace.code-workspace
+build/*
+.vs

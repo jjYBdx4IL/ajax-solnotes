@@ -5,7 +5,7 @@
 }
 
 body {
-  background: url(../images/header.gif) repeat-x;
+  background: url(header.gif) repeat-x;
   font-family: 'Roboto',arial,sans-serif;
   font-size: 15px;
 }
@@ -20,7 +20,7 @@ a:link, a:visited, a:hover, a:active, .colorscheme {
 }
 @media (prefers-color-scheme: dark) {
     body {
-      background: url(../images/header_dark.gif) repeat-x;
+      background: url(header_dark.gif) repeat-x;
     }
     a:link, a:visited, a:hover, a:active, .colorscheme {
       background-color: #202124;
@@ -66,8 +66,7 @@ a:hover {
 
 
 #status {
-  display: inline;
-  visibility: hidden;
+  display: none;
   top: 2px;
   background-color: black;
   color: red;

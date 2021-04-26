@@ -15,13 +15,11 @@ const express = require('express');
 const os = require('os');
 var fs = require('fs');
 var path = require('path');
-var _url = require('url');
-var qs = require('querystring');
 var glob = require("glob")
 const solr = require('solr-client');
 const yargs = require('yargs');
 var PromisePool = require('es6-promise-pool');
-const { notDeepEqual } = require('assert');
+var nunjucks = require('nunjucks');
 const { exit } = require('process');
 
 const noteSuffix = ".txt";
@@ -29,6 +27,23 @@ const repoRoot = path.join(__dirname, "repo");
 
 // https://nodejs.org/en/knowledge/command-line/how-to-parse-command-line-arguments/
 const argv = yargs
+    .option('prod', {
+        description: 'production switch',
+        type: 'boolean',
+    })
+    .default('prod', false)
+    .option('force', {
+        description: 'insist on insanity',
+        alias: 'f',
+        type: 'boolean',
+    })
+    .default('force', false)
+    .option('solrUrl', {
+        description: 'Solr service url for the JS client to use',
+        alias: 'u',
+        type: 'string',
+    })
+    .default('solrUrl', 'http://127.0.0.1:8983/solr/notes/select')
     .option('port', {
         description: 'server port',
         alias: 'p',
@@ -42,7 +57,7 @@ const argv = yargs
     })
     .default('servername', '127.0.0.1')
     .option('stopafterimport', {
-        alias: 'i',
+        alias: 's',
         description: 'do not start the server after pushing notes to the index',
         type: 'boolean',
     })
@@ -81,11 +96,20 @@ if (argv.stopafterimport && argv.skipimport) {
     throw Error("cannot use --skipimport and --stopafterimport at the same time");
 }
 
+if (argv.prod) {
+    console.log("Production mode enabled.");
+}
+
 // Create a client (collection ("core") name: "notes"; create with: "solr.cmd create_core -c notes").
 // Expects solr at localhost:8983.
 const client = solr.createClient({core : 'notes'});
 
 const app = express();
+var nunjucksEnv = nunjucks.configure('views', {
+    autoescape: true,
+    express: app
+});
+nunjucksEnv.addGlobal('prod', argv.prod);
 function startApp() {
     if (argv.stopafterimport) {
         exit(0);
@@ -173,6 +197,7 @@ if (!argv.skipimport) {
             return null
         }
     }
+    //@ts-ignore
     var pool = new PromisePool(promiseProducer, os.cpus().length);
 
     // start submitting the notes to the index
@@ -195,6 +220,10 @@ if (!argv.skipimport) {
 
 
 if (argv.livereload) {
+    if (argv.prod && !argv.force) {
+        console.log("refusing to use live-reload in prod, aborting...");
+        exit(1);
+    }
     const livereload = require("livereload");
     const connectLivereload = require("connect-livereload");
 
@@ -309,7 +338,7 @@ function loadNote(noteId) {
         offset = eol+1;
     }
 
-    headerLines.forEach(function(line, key, hl) {
+    headerLines.forEach(function(line, _key, _hl) {
         var m = line.match(/([^:]+):(.*)/);
         if (m === null) {
             throw Error("bad header line: " + line);
@@ -491,5 +520,26 @@ app.post('/d/:noteId', express.json(), function (req, res){
             });
         }
     });
- });
- app.get('*', express.static(__dirname))
+});
+if (argv.prod) {
+    app.get('*.js', express.static(path.join(__dirname, "build")))
+    app.get('*.css', express.static(path.join(__dirname, "build")))
+} else {
+    app.get('*.js', express.static(path.join(__dirname, "src")))
+    app.get('*.css', express.static(path.join(__dirname, "css")))
+}
+app.get('*.gif', express.static(path.join(__dirname, "images")))
+app.get('*.ico', express.static(path.join(__dirname, "build")))
+app.get('/getSolrConfig', express.json(), function (req, res){  
+    res.contentType = 'application/json';
+    /** @type {GetSolrConfigResponse} */
+    var reply = {status: 0, error: '', solrUrl: argv.solrUrl};
+    res.send(JSON.stringify(reply)).end();
+});
+
+// index.html gets rendered through a templating engine so we can switch javascript loading
+// from dev to prod via command line switch
+// https://mozilla.github.io/nunjucks/templating.html
+app.get('/', function(req, res) {
+    res.render('index.html');
+});

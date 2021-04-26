@@ -3,10 +3,8 @@
 
 ## Functional Status
 
-* Implemented: live-search, CRUD note.
-* tbd:
-  * retain formatting in editor
-  * style
+* All working.
+* Minor UI tweaks might be a good idea [tm].
 
 ## Overview
 
@@ -30,19 +28,28 @@
 
 ## Changes & Remarks
 
-* This project has been derived in large parts from [Ajax Solr](https://github.com/evolvingweb/ajax-solr).
-* Out-of-order responses are prevented by calling abort() (`AbstractManager::cancelAllRequests()`)on all open async requests when the user issues a new live-search request (ie. changes the search field). Also, the result display update timer gets cancelled (`ResultWidget::disableUntilNextResponse()`).
-* Everything that's not needed has been stripped out.
-* Updated external JavaScript assets to the current stable version (jQuery/UI, RequireJS).
+* This project has been derived in parts from [Ajax Solr](https://github.com/evolvingweb/ajax-solr), but has since been completely rewritten.
+* Out-of-order responses are prevented by calling abort() on a potentially running async request when the user issues a new live-search request (ie. changes the search field). Also, the result display update/relayout timer gets cancelled.
+* Everything that's not needed has been stripped out (jQuery UI, RequireJS).
+* JQuery has been updated and [HE](https://github.com/mathiasbynens/he) added.
 * CSS supports browser dark mode.
+* Added [nunjucks](https://mozilla.github.io/nunjucks/templating.html) templating system to be able to switch js include tags in `index.html` between minified and dev sources depending on the command line switch `--prod`.
+* Added [live-reload](https://www.npmjs.com/package/livereload) for instant css updates and automatic page refreshes. Enable via `--livereload`. Or simply `npm run dev`.
+* Switched over from the strange RequireJS loading and init system to a clean, simple, straight-forward class-based flat initialization. 'Main program' is now in src/client.js and the js loading sequence is defined in `views/index.html` (from where also the minify process extracts it). This rewrite allows the use of type checking without having to migrate to TypeScript.
 
 ## Installation
 
 * Node.js server:
   * `node server.js [-h]`
+  * Check `--help`and `package.json` for available `npm run <opt>` options.
   * Alternatively, for development:
     * `npm install nodemon -g`
     * `nodemon server.js [-h]`
+    * or simply `npm run dev`
+  * For prod:
+    * `npm run minify` minifies css and js using [Uglify-JS](https://github.com/mishoo/UglifyJS) and [uglifycss](https://www.npmjs.com/package/uglifycss).
+    * `npm run prod`
+    * That will enable the `--prod` flag, which in turn will redirect css and js loading to the `build/` dir where the minified css and js files get written to.
   * Use the `--help` option to display a current list of available arguments.
   * If all went right, the frontend should be accessible at http://localhost:3000 now.
 * [Solr 8](https://solr.apache.org/downloads.html):
@@ -59,7 +66,7 @@
        * Optionally, set the link's properties to start the window minimized (it will only show for a second anyways).
        * You can check the server by starting the Cygwin command line (ie. bash), then enter `screen -r` to attach to the solr console. Press `ctrl-a, d` to detach and leave it alone. Use `screen -ls` to show a list of running screen sessions.
        * The administrative frontend should be running at http://localhost:8983 now.
-* Optional: generate the favicon (optional, needs [ImageMagick 7](https://imagemagick.org/index.php) - available via Cygwin on Windows 10): `magick -background transparent "favicon.svg" -define icon:auto-resize=16,24,32,48,64,72,96,128,256 favicon.ico`
+* Optional: generate the favicon (needs [ImageMagick 7](https://imagemagick.org/index.php) - available via Cygwin on Windows 10): `magick -background transparent "favicon.svg" -define icon:auto-resize=16,24,32,48,64,72,96,128,256 build/favicon.ico`
 
 ## Continuous Integration
 
@@ -69,4 +76,6 @@
 ## Development
 
 * `npm run dev`
+* `tsconfig.json` is there to enable type checking for JavaScript (works in VSCode). There is no intention to switch to TypeScript. Development cycles probably would be even faster using [GWT](http://www.gwtproject.org/). The same applies to `lib.d.ts`. It's essentially a better alternative to `//@ts-ignore`. In the optimal case, `npm i @types/<pkgname> --save-dev` is available.
+* `__env_(prod|dev).js` contains the environment definitions. Beware that `DEBUG` and `PROD` variable ininitializations for `--prod` might be fake because they are overwritten in `uglify.js` to force the dead code elimination.
 
