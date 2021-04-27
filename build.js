@@ -12,8 +12,7 @@ fs.mkdirSync(builddir)
 console.log("minifying...")
 execSync("npm run minify")
 
-console.log("generating favicon...")
-execSync("magick -background transparent favicon.svg -define icon:auto-resize=16,24,32,48,64,72,96,128,256 "
-    + path.join(builddir, "favicon.ico"))
+console.log("copying favicon...")
+fs.copyFileSync(path.join(__dirname, "favicon.svg"), path.join(builddir, "favicon.svg"))
 
 console.log("done.")

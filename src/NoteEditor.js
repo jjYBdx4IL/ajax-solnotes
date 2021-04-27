@@ -1,4 +1,7 @@
 
+/**
+ * For simplicity, we don't use async when loading/saving notes in the editor.
+ */
 const NoteEditor = class {
     constructor() {
         this.init();
@@ -37,12 +40,21 @@ const NoteEditor = class {
         this.getEditorTextElement().on('input', function () { self.onInput(this); });
         this.getEditorTextElement().on('click', function (evt) { self.onClick(evt); });
 
-        // prevent browsers from inserting divs into contenteditable div
-        // (otherwise we have a hard time to condense the html down into properly formatted plain text)
         document.addEventListener('keydown', event => {
+            // prevent browsers from inserting divs into contenteditable div
+            // (otherwise we have a hard time to condense the html down into properly formatted plain text)
             if (event.key === 'Enter') {
                 document.execCommand('insertLineBreak')
                 event.preventDefault()
+            }
+            // Quick toggle between "create note (modal editor UI)" and search UI.
+            // Will save changes when leaving the editor.
+            else if (event.key == "Escape") {
+                if (self.isModal()) {
+                    self.toggleModal(false);
+                } else {
+                    self.openEditor(null);
+                }
             }
         })
 
@@ -55,15 +67,6 @@ const NoteEditor = class {
         $("#delete").on("click", function () {
             if (confirm('Really DELETE ERASE DESTROY VAPORIZE this note?')) {
                 self.deleteNote();
-            }
-        });
-        $("#editor").on('keydown', function (event) {
-            if (event.key == "Escape") {
-                if (self.isModal()) {
-                    self.toggleModal(false);
-                } else {
-                    self.openEditor(null);
-                }
             }
         });
 

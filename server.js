@@ -31,6 +31,7 @@ var nunjucks = require('nunjucks');
 const child_process = require('child_process');
 var commandExists = require('command-exists');
 var javahome = require('find-java-home');
+const open = require('open');
 
 const noteLmodHeader = "Last-Modified";
 const noteCreatedHeader = "Created";
@@ -122,6 +123,10 @@ const argv = yargs
         type: 'string'
     })
     .default('gktoimport', null, "disabled")
+    .option('openurl', {
+        description: 'open index.html in your browser after server start',
+        type: 'boolean'
+    })
     .help()
     .alias('help', 'h')
     .argv;
@@ -1091,7 +1096,7 @@ execStack.push(function (cb) {
         app.get('*.css', express.static(path.join(__dirname, "css")))
     }
     app.get('*.gif', express.static(path.join(__dirname, "images")))
-    app.get('*.ico', express.static(buildRoot))
+    app.get('*.svg', express.static(buildRoot))
     app.get('/getSolrConfig', express.json(), function (req, res){  
         res.contentType = 'application/json';
         /** @type {GetSolrConfigResponse} */
@@ -1116,6 +1121,18 @@ execStack.push(function (cb) {
     })
 })
 
+execStack.push(function (cb) {
+    if(!argv.openurl) {
+        cb()
+        return
+    }
+
+    if(argv.verbose) {
+        console.log("Opening server url in browser")
+    }
+    open(serverUrl)
+    cb()
+})
 
 if(argv.verbose) {
     console.log("Processing exec stack...")

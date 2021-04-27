@@ -4,6 +4,7 @@
 ## Functional Status
 
 * All working.
+* Simple Google Keep Takeout import mechanism.
 * No authorization mechanism. Intended for non-public, private use behind a firewall. Not multi-user friendly because there is currently no mechanism to coordinate concurrent edits.
 * Minor UI tweaks might be a good idea [tm].
 
@@ -59,7 +60,7 @@
     * or simply `npm run dev`
   * For prod:
     * `npm run minify` minifies css and js using [Uglify-JS](https://github.com/mishoo/UglifyJS) and [uglifycss](https://www.npmjs.com/package/uglifycss).
-    * `npm run build` will do the above, and convert and put the favicon into `build/`. It will also clean and recreate the build directory.
+    * `npm run build` will do the above, and it will also clean and recreate the build directory before starting.
     * `npm run prod`
     * That will enable the `--prod` flag, which in turn will redirect css and js loading to the `build/` dir where the minified css and js files get written to.
   * Use the `--help` option to display a current list of available arguments.
@@ -80,7 +81,6 @@
        * Optionally, set the link's properties to start the window minimized (it will only show for a second anyways).
        * You can check the server by starting the Cygwin command line (ie. bash), then enter `screen -r` to attach to the solr console. Press `ctrl-a, d` to detach and leave it alone. Use `screen -ls` to show a list of running screen sessions.
        * The administrative frontend should be running at http://localhost:8983 now.
-* Optional: generate the favicon (needs [ImageMagick 7](https://imagemagick.org/index.php) - available via Cygwin on Windows 10): `magick -background transparent "favicon.svg" -define icon:auto-resize=16,24,32,48,64,72,96,128,256 build/favicon.ico`
 
 ## Continuous Integration
 
@@ -90,6 +90,7 @@
 ## Development
 
 * `npm run dev`
+* Primary development environment is Cygwin (bash command line) under Windows 10 + VSCode (editor).
 * `tsconfig.json` is there to enable type checking for JavaScript (works in VSCode). There is no intention to switch to TypeScript. Development cycles probably would be even faster using [GWT](http://www.gwtproject.org/). The same applies to `lib.d.ts`. It's essentially a better alternative to `//@ts-ignore`. In the optimal case, `npm i @types/<pkgname> --save-dev` is available.
 * `__env_(prod|dev).js` contains the environment definitions. Beware that `DEBUG` and `PROD` variable ininitializations for `--prod` might be fake because they are overwritten in `uglify.js` to force the dead code elimination.
 
@@ -99,3 +100,7 @@
 * Team support: handle concurrent edits somehow.
 * Potential performance improvement for larger installations: use solr for storage and add multi-tenancy. The latter is a bit useless because an alternative to Google Keep should not do the same as Google: run many users through the same company/server.
 * Google Keep data import.
+
+## Bugs
+
+Yes.
