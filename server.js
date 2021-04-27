@@ -129,6 +129,9 @@ if (argv.prod) {
     console.log("Production mode enabled.");
 }
 
+console.log("Starting server in: " + __dirname)
+console.log("Note repository root: " + argv.reporoot)
+
 if (argv.portinc) {
     argv.serverport += argv.portinc
     const myurl = new URL(argv.solrUrl);
@@ -138,6 +141,11 @@ if (argv.portinc) {
         console.log("solrUrl changed port to: " + argv.solrUrl)
     }
 }
+
+console.log("Solr instance: " + argv.solrUrl + " ("  + (argv.managesolr ? "managed" : "unmanaged") + ")")
+console.log("Live-reload: " + (argv.livereload ? "enabled" : "disabled"))
+
+const serverUrl = `http://${argv.servername}:${argv.serverport}`
 
 function extractSolrCoreName() {
     var m = argv.solrUrl.match(/\/([^\/]+)\/select$/)
@@ -518,7 +526,7 @@ var submitToIndex = function (noteId, doSync=false) {
             reject(error);
         }
         // always submit notes with a modified date to the index so we can sort them by activity
-        if (note.lmod_dt === void 0) {
+        if (!note.lmod_dt) {
             note.lmod_dt = note.created_dt;
         }
         solrClient.add(note, function(err,obj){
@@ -619,7 +627,7 @@ execStack.push(function (cb) {
 
     nunjucksEnv.addGlobal('prod', argv.prod);
         app.listen(argv.serverport, argv.servername, () => {
-        console.log(`Listening at http://${argv.servername}:${argv.serverport}`)
+        console.log(`Listening at ${serverUrl}`)
         cb()
     })
 });
