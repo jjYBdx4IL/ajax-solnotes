@@ -11,6 +11,7 @@
 //
 // curl "http://localhost:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
 //
+const url = require('url');
 const waitPort = require('wait-port');
 const { promisify } = require('util')
 const got = require("got");
@@ -31,7 +32,6 @@ const child_process = require('child_process');
 var commandExists = require('command-exists');
 var javahome = require('find-java-home');
 
-const solrCoreName = "notes";
 const noteSuffix = ".txt";
 const buildRoot = path.join(__dirname, "build")
 
@@ -108,6 +108,11 @@ const argv = yargs
         type: 'string',
     })
     .default('reporoot', path.join(__dirname, "repo"))
+    .option('portinc', {
+        description: 'increment all ports by this number',
+        type: 'number',
+    })
+    .default('portinc', 0)
     .help()
     .alias('help', 'h')
     .argv;
@@ -124,6 +129,27 @@ if (argv.prod) {
     console.log("Production mode enabled.");
 }
 
+if (argv.portinc) {
+    argv.serverport += argv.portinc
+    const myurl = new URL(argv.solrUrl);
+    myurl.port = "" + (parseInt(myurl.port) + argv.portinc)
+    argv.solrUrl = myurl.toString()
+    if (argv.verbose) {
+        console.log("solrUrl changed port to: " + argv.solrUrl)
+    }
+}
+
+function extractSolrCoreName() {
+    var m = argv.solrUrl.match(/\/([^\/]+)\/select$/)
+    if (m.length == 2) {
+        return m[1];
+    } else {
+        throw Error("cannot extract core name from solrUrl: " + argv.solrUrl)
+    }
+}
+const solrCoreName = extractSolrCoreName();
+
+
 var execStack = [];
 
 //------------------------------------------------------------------------------------
@@ -137,8 +163,8 @@ const managedSolrVersion = "8.8.2"
 const managedSolrSetupDoneFlag = path.join(managedSolrPath, ".setup_complete")
 const managedSolrBinPath = path.join(managedSolrPath, "bin")
 const managedSolrCmdScript = os.platform() == 'win32' ? "solr.cmd" : "./solr";
-const managedSolrHostName = "127.0.0.1"
-const managedSolrPort = 8983;
+const managedSolrHostName = new URL(argv.solrUrl).hostname
+const managedSolrPort = parseInt(new URL(argv.solrUrl).port)
 const managedSolrEnv = process.env;
 
 function managedSolrDownload(cb) {
@@ -225,7 +251,11 @@ function managedSolrStop(cb) {
         if (!err) {
             console.log("Stopping Solr...")
             try {
-                child_process.execSync(managedSolrCmdScript + " stop -all", {cwd: managedSolrBinPath, env: managedSolrEnv});
+                var cmd = managedSolrCmdScript + " stop -p " + managedSolrPort
+                if (argv.verbose) {
+                    console.log("executing command: " + cmd)
+                }
+                child_process.execSync(cmd, {cwd: managedSolrBinPath, env: managedSolrEnv});
             } catch (err) {
                 console.log("failed to stop instance, let's hope we can continue anyways...")
             }
@@ -305,7 +335,11 @@ function managedSolrStart(cb) {
     console.log("Starting Solr...")
     // on windows the solr start command does not properly detach, so we have to keep the process attached
     // or kill the server instantly
-    child_process.exec(managedSolrCmdScript + " start", {cwd: managedSolrBinPath, env: managedSolrEnv});
+    var cmd = `${managedSolrCmdScript} start -p ${managedSolrPort} -h ${managedSolrHostName}`
+    if (argv.verbose) {
+        console.log("executing command: " + cmd)
+    }
+    child_process.exec(cmd, {cwd: managedSolrBinPath, env: managedSolrEnv});
     waitPort({host: managedSolrHostName, port: managedSolrPort}).then(function() {
         cb()
     });
@@ -317,7 +351,12 @@ execStack.push(function(cb) {
     if (argv.verbose) {
         console.log("creating solr client")
     }
-    solrClient = solr.createClient({core : solrCoreName})
+    solrClient = solr.createClient({
+        secure: new URL(argv.solrUrl).protocol == 'https',
+        host: new URL(argv.solrUrl).hostname,
+        port: parseInt(new URL(argv.solrUrl).port),
+        core: solrCoreName
+    })
     cb()
 });
 
@@ -326,8 +365,11 @@ function managedSolrSetup(cb) {
         cb();
         return;
     }
-    console.log("Setting up Solr core: " + solrCoreName)
-    child_process.execSync(managedSolrCmdScript + " create_core -c " + solrCoreName, {cwd: managedSolrBinPath, env: managedSolrEnv});
+    var cmd = `${managedSolrCmdScript} create_core -c ${solrCoreName} -p ${managedSolrPort}`
+    if (argv.verbose) {
+        console.log("executing command: " + cmd)
+    }
+    child_process.execSync(cmd, {cwd: managedSolrBinPath, env: managedSolrEnv});
     cb()
 }
 execStack.push(managedSolrSetup);

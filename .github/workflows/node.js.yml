@@ -29,7 +29,7 @@ jobs:
       with:
         path: |
           ./cache
-        key: ${{ runner.os }}-stuff
+        key: solr882.zip
     # https://github.com/marketplace/actions/setup-java-jdk
     - uses: actions/setup-java@v2
       with:
@@ -40,17 +40,10 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - run: install -d cache
-    - run: if ! test -e cache/solr.tgz; then wget -O cache/solr.tgz https://archive.apache.org/dist/lucene/solr/8.8.2/solr-8.8.2.tgz; fi
-    - run: install -d solr
-    - run: tar xzf cache/solr.tgz --strip-components=1 -C solr
-    - run: sed -i solr/server/etc/jetty.xml -e 's:X-Content-Type-Options:X-GTFO:'
-    - run: grep X- solr/server/etc/jetty.xml
-    - run: cd solr/bin && ./solr start && ./solr create_core -c notes || ls -l
-    - run: curl "http://127.0.0.1:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
+    - run: if ! test -e cache/solr.zip; then wget -O cache/solr.zip https://archive.apache.org/dist/lucene/solr/8.8.2/solr-8.8.2.zip; fi
+    - run: cp -fv cache/solr.zip .
     - run: npm install
     - run: npm run ci
-    - run: curl "http://127.0.0.1:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=0"
-      if: always()
     - run: cat solr/server/logs/*
       if: always()
 
