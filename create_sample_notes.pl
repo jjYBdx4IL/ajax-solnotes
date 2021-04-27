@@ -20,9 +20,9 @@ for my $fn (@files) {
 
 my @words = keys %words;
 
-print "words: ", scalar @words, "\n";
+print "words discovered: ", scalar @words, "\n";
 
-for (my $i = 0; $i < 10000; $i++) {
+for (my $i = 0; $i < ($ARGV[0] || 10000); $i++) {
     my $totalLen = 40+rand()*rand()*2000;
     my $output = "Created: $t\n\n";
     while (length($output) < $totalLen) {

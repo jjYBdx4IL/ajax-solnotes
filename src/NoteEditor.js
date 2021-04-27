@@ -126,7 +126,7 @@ const NoteEditor = class {
         this.getEditorTextElement().html("");
         this.isDirty = false;
         this.toggleModal(false);
-        this.liveSearchClient.updateResults();
+        this.liveSearchClient.restart();
     }
     onSaveError(jqXHR, textStatus, errorThrown) {
         this.isDirty = true;
@@ -180,7 +180,7 @@ const NoteEditor = class {
         }
         this.isDirty = false;
         this.toggleModal(false);
-        this.liveSearchClient.updateResults();
+        this.liveSearchClient.restart();
     }
 
     //

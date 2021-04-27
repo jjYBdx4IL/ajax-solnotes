@@ -34,12 +34,20 @@
     /** @type {SelectResponse} */
     res = undefined;
   
+    /**
+     * THis is the entry point for LiveSearchWidget to force the live update on every search term change.
+     * @param {string} newQuery 
+     */
     updateQuery(newQuery) {
       if (this.q != newQuery) {
         this.q = newQuery;
         this.restart();
       }
     }
+    /**
+     * Called by NoteEditor on success for create/update/delete note requests.
+     * Also by this class on column count change (resize).
+     */
     restart() {
       this.start = 0;
       this.updateResults();

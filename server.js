@@ -32,7 +32,11 @@ const child_process = require('child_process');
 var commandExists = require('command-exists');
 var javahome = require('find-java-home');
 
+const noteLmodHeader = "Last-Modified";
+const noteCreatedHeader = "Created";
+const noteEol = "\n";
 const noteSuffix = ".txt";
+
 const buildRoot = path.join(__dirname, "build")
 
 // https://nodejs.org/en/knowledge/command-line/how-to-parse-command-line-arguments/
@@ -54,12 +58,12 @@ const argv = yargs
     })
     .default('force', false)
     .option('solrUrl', {
-        description: 'Solr service url for the JS client to use',
+        description: 'Solr service url (incl final "/select")',
         alias: 'u',
         type: 'string',
     })
     .default('solrUrl', 'http://127.0.0.1:8983/solr/notes/select')
-    .option('port', {
+    .option('serverport', {
         description: 'server port',
         alias: 'p',
         type: 'number',
@@ -113,6 +117,11 @@ const argv = yargs
         type: 'number',
     })
     .default('portinc', 0)
+    .option('gktoimport', {
+        description: 'Google Keep Takeout import (specify source directory, will terminate after writing files to repo dir)',
+        type: 'string'
+    })
+    .default('gktoimport', null, "disabled")
     .help()
     .alias('help', 'h')
     .argv;
@@ -125,9 +134,88 @@ if (!fs.existsSync(argv.reporoot) || !fs.statSync(argv.reporoot).isDirectory()) 
     throw Error(argv.reporoot + " must point to an existing directory")
 }
 
+if (argv.gktoimport && (!fs.existsSync(argv.gktoimport) || !fs.statSync(argv.gktoimport).isDirectory())) {
+    throw Error(argv.gktoimport + " must point to an existing directory")
+}
+
 if (argv.prod) {
     console.log("Production mode enabled.");
 }
+
+
+
+
+//---------------------------------------------------------------------------------------
+// Google Keep Takeout import
+if (argv.gktoimport) {
+    console.log("Import requested. Will import dump data in " + argv.gktoimport + " to: " + argv.reporoot)
+    console.log("WARNING! This import routine may ignore some metadata stored in your Google Keep Takeout dump.")
+    console.log("References to images will be attached to the text content where this import process can find them.")
+    console.log("Beyond that, there is no image import.")
+    console.log("It's advised to keep your takeout dump around, especially the images included in it (if any).")
+    var filelist = glob.sync('**/*.json', {cwd: argv.gktoimport, follow: false, nodir: true});
+    if (!fs.existsSync(path.join(argv.gktoimport, "Labels.txt"))) {
+        console.log(`WARNING! No 'Labels.txt' file found in your takeout directory. Are you sure ${argv.gtk} contains a Google Keep Takeout?`)
+    }
+    console.log(filelist.length + " notes (.json files) found in your dump")
+    filelist.forEach(function(file){
+        var json = fs.readFileSync(path.join(argv.gktoimport, file)).toString()
+        // {"attachments":[{"filePath":"16c90563b9a.8e57e880aaed9c81.jpeg","mimetype":"image/jpeg"}],"color":"DEFAULT","isTrashed":false,"isPinned":false,"isArchived":false,"textContent":"...","title":"abc","userEditedTimestampUsec":1565789725546000}
+        const obj = JSON.parse(json);
+        const lmod = obj.userEditedTimestampUsec / 1000
+        const title = obj.title
+        var text = obj.textContent
+        var footerRefs = []
+        if(obj.attachments) {
+            obj.attachments.forEach(el => {
+                if (!el.filePath) {
+                    throw new Error("unexpected format: " + json)
+                }
+                footerRefs.push("ATTACHMENT:" + el.filePath)
+            });
+        }
+        if (obj.isTrashed) {
+            footerRefs.push("FLAG:TRASHED")
+        }
+        if (obj.isPinned) {
+            footerRefs.push("FLAG:PINNED")
+        }
+        if (obj.isArchived) {
+            footerRefs.push("FLAG:ARCHIVED")
+        }
+        if (title.length) {
+            text = title + noteEol + text
+        }
+        if (footerRefs.length) {
+            text += noteEol
+            text += footerRefs.join(", ")
+        }
+        /** @type {INote} */
+        var note = {
+            id: createNoteBaseIdFromDate(new Date(lmod)) + noteSuffix,
+            text: text,
+            lmod_dt: new Date(lmod).toISOString(),
+            created_dt: new Date(lmod).toISOString()
+        }
+        var onDiskData = cvtNoteToOnDiskFormat(note);
+        var tgtFn = path.join(argv.reporoot, note.id)
+        if (fs.existsSync(tgtFn)) {
+            throw new Error("refusing to overwrite another note: " + tgtFn)
+        }
+        fs.writeFileSync(tgtFn, onDiskData);
+    })
+    console.log("Google Keep Takeout import complete, exit")
+    process.exit(0)
+}
+
+
+
+
+
+
+
+
+
 
 console.log("Starting server in: " + __dirname)
 console.log("Note repository root: " + argv.reporoot)
@@ -237,9 +325,6 @@ function reorder_cygwin_paths(env) {
         p1.push(_p);
     });
     env.PATH = p1.join(";");
-    if (argv.verbose) {
-        console.log("reordered path: ", p1)
-    }
 }
 
 function managedSolrAdjustEnv(cb) {
@@ -515,15 +600,21 @@ execStack.push(function(cb) {
 
 var submitToIndex = function (noteId, doSync=false) {
     return new Promise(function (resolve, reject) {
-        if(argv.verbose)
+        if (!noteId) {
+            throw new Error("no note id")
+        }
+        if(argv.verbose) {
             console.log("adding to index: " + noteId);
+        }
         // use relative url-ized path as id
         /** @type {INote} */
         var note;
         try {
             note = loadNote(noteId);
         } catch (error) {
+            console.log(error)
             reject(error);
+            return;
         }
         // always submit notes with a modified date to the index so we can sort them by activity
         if (!note.lmod_dt) {
@@ -615,8 +706,12 @@ var nunjucksEnv = undefined
 
 execStack.push(function (cb) {
     if (argv.stopafterimport) {
-        cb("stop-after-import")
-        return
+        console.log("--stopafterimport requested. Doing as commanded.")
+        process.exit(0)
+    }
+
+    if(argv.verbose) {
+        console.log("Initializing Express and template engine")
     }
 
     app = express()
@@ -626,10 +721,7 @@ execStack.push(function (cb) {
     });
 
     nunjucksEnv.addGlobal('prod', argv.prod);
-        app.listen(argv.serverport, argv.servername, () => {
-        console.log(`Listening at ${serverUrl}`)
-        cb()
-    })
+    cb()
 });
 
 //--------------------------------------------------------------------------
@@ -649,6 +741,10 @@ execStack.push(function (cb) {
         return
     }
 
+    if(argv.verbose) {
+        console.log("Activating live-reload")
+    }
+
     // open livereload high port and start to watch public directory for changes
     const liveReloadServer = livereload.createServer();
     liveReloadServer.watch(__dirname);
@@ -661,6 +757,7 @@ execStack.push(function (cb) {
     });
 
     app.use(connectLivereload());
+    cb()
 });
 
 
@@ -672,6 +769,9 @@ execStack.push(function (cb) {
         return
     }
 
+    if(argv.verbose) {
+        console.log("Activating request logging")
+    }
     const morgan = require('morgan');
     app.use(morgan('dev'));
     cb()
@@ -680,15 +780,14 @@ execStack.push(function (cb) {
 //--------------------------------------------------------------------------
 // note rest CRUD
 
-const noteEol = "\n";
-const noteLmodHeader = "Last-Modified";
-const noteCreatedHeader = "Created";
-
 // create note editor session id -> successfully created note id and timestamp for cleanup
 var createSessionIds = new Map();
 
 execStack.push(function (cb) {
-    var createSessionIdStaleSecs = 12;
+    if(argv.verbose) {
+        console.log("Starting createSessionId housekeeping")
+    }
+    var createSessionIdStaleSecs = 3600;
     var createSessionIdsPruner = function() {
         var now = new Date().getTime()/1000;
         createSessionIds.forEach(function(value, key) {
@@ -697,9 +796,18 @@ execStack.push(function (cb) {
             }
         })
     }
-    var createSessionIdsPrunerIval = setInterval(createSessionIdsPruner, createSessionIdStaleSecs/3 * 1000);
+    setInterval(createSessionIdsPruner, createSessionIdStaleSecs/2 * 1000);
     cb()
 })
+
+/** @param {Date} dt @returns {string} */
+function createNoteBaseIdFromDate(dt) {
+    var noteId = dt.toISOString();
+    // remove milliseconds and more
+    noteId = noteId.replace(/\..*$/g, '');
+    noteId = noteId.replace(/[^T0-9]/g, '');
+    return noteId
+}
 
 // for now, only use sync ops when storing the note to avoid having to deal with concurrency issues for no reason
 function createUniqueNoteId(sessionId) {
@@ -708,10 +816,7 @@ function createUniqueNoteId(sessionId) {
     }
 
     // UTC time in ISO8601 format
-    var noteId = new Date().toISOString();
-    // remove milliseconds and more
-    noteId = noteId.replace(/\..*$/g, '');
-    noteId = noteId.replace(/[^T0-9]/g, '');
+    var noteId = createNoteBaseIdFromDate(new Date())
     var noteIdExt = noteId + noteSuffix;
     var i = 0;
     while (fs.existsSync(path.join(argv.reporoot, noteIdExt))) {
@@ -806,6 +911,10 @@ function loadNote(noteId) {
 
 
 execStack.push(function (cb) {
+    if(argv.verbose) {
+        console.log("Configuring express routes and handlers")
+    }
+
     // http://expressjs.com/en/api.html
     app.use(express.json());
     app.param('noteId', function (req, res, next, noteId) {
@@ -857,6 +966,7 @@ execStack.push(function (cb) {
         submitToIndex(note.id, true).then(function() {
                 res.send(JSON.stringify(reply)).end();
             }, function(error) {
+                console.log(error)
                 reply.status = 2;
                 reply.error = error;
                 res.status(500).send(JSON.stringify(reply)).end();
@@ -996,7 +1106,14 @@ execStack.push(function (cb) {
         res.render('index.html');
     });
 
-    cb()
+    if(argv.verbose) {
+        console.log("Done.")
+    }
+
+    app.listen(argv.serverport, argv.servername, () => {
+        console.log(`Listening at ${serverUrl}`)
+        cb()
+    })
 })
 
 
