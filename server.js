@@ -11,7 +11,7 @@
 //
 // curl "http://localhost:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
 //
-const url = require('url');
+var crypto = require('crypto');
 const waitPort = require('wait-port');
 const { promisify } = require('util')
 const got = require("got");
@@ -160,12 +160,38 @@ var execStack = [];
 const managedSolrPath = path.join(__dirname, "solr")
 const managedSolrZip = path.join(__dirname, "solr.zip")
 const managedSolrVersion = "8.8.2"
+const managedSolrSha512 = 'd7f1b381bceef17436053e42e3289857b670efba6060ffd3c99757c7df37a55cca89506937935ac34778c76b1cfe8984aba2c2ef76783a7837a25d2ee25ace55'
 const managedSolrSetupDoneFlag = path.join(managedSolrPath, ".setup_complete")
 const managedSolrBinPath = path.join(managedSolrPath, "bin")
 const managedSolrCmdScript = os.platform() == 'win32' ? "solr.cmd" : "./solr";
 const managedSolrHostName = new URL(argv.solrUrl).hostname
 const managedSolrPort = parseInt(new URL(argv.solrUrl).port)
 const managedSolrEnv = process.env;
+
+function checksumFile(hashName, path) {
+    return new Promise((resolve, reject) => {
+        const hash = crypto.createHash(hashName);
+        const stream = fs.createReadStream(path);
+        stream.on('error', err => reject(err));
+        stream.on('data', chunk => hash.update(chunk));
+        stream.on('end', () => resolve(hash.digest('hex')));
+    });
+}
+
+function verifyFileCksum(path, hash, hashname) {
+    return new Promise((resolve, reject) => {
+        checksumFile(hashname, path).then(function(_hash) {
+            if (hash != _hash) {
+                reject(`checksum verification failed for ${path}: expected ${hash} but got ${_hash}`)
+            } else {
+                console.log("checksum ok")
+                resolve()
+            }
+        }, function(err) {
+            reject(err)
+        })
+    })
+}
 
 function managedSolrDownload(cb) {
     if (!argv.managesolr || fs.existsSync(managedSolrSetupDoneFlag) || fs.existsSync(managedSolrZip)) {
@@ -179,8 +205,10 @@ function managedSolrDownload(cb) {
     fs.mkdirSync(path.dirname(managedSolrZip), { recursive: true })
     //@ts-ignore
     pipeline(got.stream(url), fs.createWriteStream(tmpfn)).then(function(){
-        fs.renameSync(tmpfn, managedSolrZip)
-        cb()
+        verifyFileCksum(tmpfn, managedSolrSha512, "sha512").then(function(result) {
+            fs.renameSync(tmpfn, managedSolrZip)
+            cb()
+        })
     })
 }
 execStack.push(managedSolrDownload);
