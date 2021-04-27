@@ -1,16 +1,17 @@
 
-### Simple Note-Keeping With Live-Search and Text Files Backend
+### Simple Note-Keeping With Live-Search and Text Files Backend For Your LAN
 
 ## Functional Status
 
 * All working.
+* No authorization mechanism. Intended for non-public, private use behind a firewall. Not multi-user friendly because there is currently no mechanism to coordinate concurrent edits.
 * Minor UI tweaks might be a good idea [tm].
 
 ## Overview
 
 * Intended as an alternative to Google Keep, one that can be run locally and integrates nicely with version control systems (ie. operates only on simple text files, which can then be exported, converted, grepped at will).
 * Uses simple text files as backend storage.
-  * Must be stored in `repo/`.
+  * By default, notes get stored in `repo/` (see `--reporoot` switch).
   * Subdirs are allowed.
   * Everything starting with a dot ('.') is ignored, incl. directories. All files larger than 1 MB are being ignored, too. Links are *not* followed.
 * Uses [Solr](https://solr.apache.org/) for *live search*. Beware: Solr is a bit of bloatware, but it's also doing everything we need. If you find a leaner substring indexer, you are welcome to add the backend support for it.
@@ -39,6 +40,16 @@
 
 ## Installation
 
+### Short Version
+
+* Move this folder where you want to have it installed, maybe `%LOCALAPPDATA%\ajax-solnotes`.
+* `npm install`
+* `npm run build`
+* `npm run managed`
+* To keep it running while logged in under Windows 10, one option is to install Cygwin+screen and use the autostart folder. See below.
+
+### Long Version
+
 * Node.js server:
   * `node server.js [-h]`
   * Check `--help`and `package.json` for available `npm run <opt>` options.
@@ -48,11 +59,14 @@
     * or simply `npm run dev`
   * For prod:
     * `npm run minify` minifies css and js using [Uglify-JS](https://github.com/mishoo/UglifyJS) and [uglifycss](https://www.npmjs.com/package/uglifycss).
+    * `npm run build` will do the above, and convert and put the favicon into `build/`. It will also clean and recreate the build directory.
     * `npm run prod`
     * That will enable the `--prod` flag, which in turn will redirect css and js loading to the `build/` dir where the minified css and js files get written to.
   * Use the `--help` option to display a current list of available arguments.
   * If all went right, the frontend should be accessible at http://localhost:3000 now.
+  * Use the `--reporoot` option to specify a custom notes repository directory. By default, `repo/` at the server.js location will be used.
 * [Solr 8](https://solr.apache.org/downloads.html):
+  * The `--managesolr` serer.js flag performs all of the following for you. It will make the server manage its own Solr instance in `solr/`.
   * Remove `X-Content-Type-Options` section from jetty.xml (but be aware of the consequences depending on your use case)
   * `solr[.cmd] start`
   * `solr[.cmd] create_core -c notes`
@@ -61,7 +75,7 @@
      * Using [Cygwin](https://www.cygwin.com/) screen package (Windows 10):
        * Install Cygwin. Install `screen` package.
        * Open autostart folder via `win-r`, then enter `shell:startup`.
-       * Link `solr-autostart.cmd` into that folder.
+       * Link `ajax-solnotes-autostart.cmd` into that folder and add the NOTESREPO *user* environment variable. The repo directory must exist. You can also just write your notes repository directory into the autostart cmd file instead.
        * The script assumes that the `solr.cmd` control script is in `%LOCALAPPDATA%\solr\bin`, ie. the top directory of the unpacked solr distribution has been renamed to `solr` (version number removed) and moved to `%LOCALAPPDATA%`.
        * Optionally, set the link's properties to start the window minimized (it will only show for a second anyways).
        * You can check the server by starting the Cygwin command line (ie. bash), then enter `screen -r` to attach to the solr console. Press `ctrl-a, d` to detach and leave it alone. Use `screen -ls` to show a list of running screen sessions.
@@ -79,3 +93,9 @@
 * `tsconfig.json` is there to enable type checking for JavaScript (works in VSCode). There is no intention to switch to TypeScript. Development cycles probably would be even faster using [GWT](http://www.gwtproject.org/). The same applies to `lib.d.ts`. It's essentially a better alternative to `//@ts-ignore`. In the optimal case, `npm i @types/<pkgname> --save-dev` is available.
 * `__env_(prod|dev).js` contains the environment definitions. Beware that `DEBUG` and `PROD` variable ininitializations for `--prod` might be fake because they are overwritten in `uglify.js` to force the dead code elimination.
 
+## Potential Further Development Angles
+
+* Public use. Needed: authorization, either for both backends (solr+nodejs), or add a proxy handler for solr to nodejs and keep solr private.
+* Team support: handle concurrent edits somehow.
+* Potential performance improvement for larger installations: use solr for storage and add multi-tenancy. The latter is a bit useless because an alternative to Google Keep should not do the same as Google: run many users through the same company/server.
+* Google Keep data import.

@@ -18,7 +18,8 @@
     },
     "include": [
         "src/*",
-        "lib.d.ts"
+        "lib.d.ts",
+        "./*.js"
     ],
     "exclude": [
         "build",

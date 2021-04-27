@@ -5,3 +5,5 @@ package-lock.json
 workspace.code-workspace
 build/*
 .vs
+solr/
+*.zip

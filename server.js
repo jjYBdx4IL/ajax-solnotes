@@ -11,6 +11,13 @@
 //
 // curl "http://localhost:8983/solr/notes/select?indent=on&q=text:*&rows=10&start=3"
 //
+const waitPort = require('wait-port');
+const { promisify } = require('util')
+const got = require("got");
+const stream = require("stream");
+const pipeline = promisify(stream.pipeline);
+const async = require("async");
+const extract = require('extract-zip')
 const express = require('express');
 const os = require('os');
 var fs = require('fs');
@@ -20,13 +27,21 @@ const solr = require('solr-client');
 const yargs = require('yargs');
 var PromisePool = require('es6-promise-pool');
 var nunjucks = require('nunjucks');
-const { exit } = require('process');
+const child_process = require('child_process');
+var commandExists = require('command-exists');
+var javahome = require('find-java-home');
 
+const solrCoreName = "notes";
 const noteSuffix = ".txt";
-const repoRoot = path.join(__dirname, "repo");
+const buildRoot = path.join(__dirname, "build")
 
 // https://nodejs.org/en/knowledge/command-line/how-to-parse-command-line-arguments/
 const argv = yargs
+    .option('managesolr', {
+        description: 'let the server script manage its own solr installation (incl download)',
+        type: 'boolean',
+    })
+    .default('managesolr', false)
     .option('prod', {
         description: 'production switch',
         type: 'boolean',
@@ -88,6 +103,11 @@ const argv = yargs
         description: 'be more verbose',
         type: 'boolean',
     })
+    .option('reporoot', {
+        description: 'primary notes storage location',
+        type: 'string',
+    })
+    .default('reporoot', path.join(__dirname, "repo"))
     .help()
     .alias('help', 'h')
     .argv;
@@ -96,46 +116,331 @@ if (argv.stopafterimport && argv.skipimport) {
     throw Error("cannot use --skipimport and --stopafterimport at the same time");
 }
 
+if (!fs.existsSync(argv.reporoot) || !fs.statSync(argv.reporoot).isDirectory()) {
+    throw Error(argv.reporoot + " must point to an existing directory")
+}
+
 if (argv.prod) {
     console.log("Production mode enabled.");
 }
 
-// Create a client (collection ("core") name: "notes"; create with: "solr.cmd create_core -c notes").
-// Expects solr at localhost:8983.
-const client = solr.createClient({core : 'notes'});
+var execStack = [];
 
-const app = express();
-var nunjucksEnv = nunjucks.configure('views', {
-    autoescape: true,
-    express: app
-});
-nunjucksEnv.addGlobal('prod', argv.prod);
-function startApp() {
-    if (argv.stopafterimport) {
-        exit(0);
+//------------------------------------------------------------------------------------
+// install/start/stop solr installation/instance
+// v8.4.0 is the latest version that doesn't completely shoot itself in the foot with
+// security features (fixes available for 9, but neither is 8 released nor have the fixes been backported)
+// https://issues.apache.org/jira/browse/SOLR-15161
+const managedSolrPath = path.join(__dirname, "solr")
+const managedSolrZip = path.join(__dirname, "solr.zip")
+const managedSolrVersion = "8.8.2"
+const managedSolrSetupDoneFlag = path.join(managedSolrPath, ".setup_complete")
+const managedSolrBinPath = path.join(managedSolrPath, "bin")
+const managedSolrCmdScript = os.platform() == 'win32' ? "solr.cmd" : "./solr";
+const managedSolrHostName = "127.0.0.1"
+const managedSolrPort = 8983;
+const managedSolrEnv = process.env;
+
+function managedSolrDownload(cb) {
+    if (!argv.managesolr || fs.existsSync(managedSolrSetupDoneFlag) || fs.existsSync(managedSolrZip)) {
+        cb();
+        return;
     }
-    app.listen(argv.serverport, argv.servername, () => {
-        console.log(`Listening at http://${argv.servername}:${argv.serverport}`)
+    var url = "https://archive.apache.org/dist/lucene/solr/" + managedSolrVersion
+        + "/solr-" + managedSolrVersion + ".zip"
+    console.log("Downloading: " + url)
+    var tmpfn = managedSolrZip + ".tmp"
+    fs.mkdirSync(path.dirname(managedSolrZip), { recursive: true })
+    //@ts-ignore
+    pipeline(got.stream(url), fs.createWriteStream(tmpfn)).then(function(){
+        fs.renameSync(tmpfn, managedSolrZip)
+        cb()
     })
 }
+execStack.push(managedSolrDownload);
 
-if (argv.reset) {
-    client.deleteAll();
-    client.commit();
-    console.log("Index resetted.");
+/** @param {NodeJS.ProcessEnv} env @returns {void} */
+function reorder_cygwin_paths(env) {
+    var p = env.PATH.split(";")
+    var p1 = [];
+    var p2 = [];
+    p.forEach(function(_p){
+        if (_p.match(/cygwin.*\\bin/i)) {
+            p2.push(_p);
+        } else {
+            p1.push(_p);
+        }
+    });
+    p2.forEach(function(_p){
+        p1.push(_p);
+    });
+    env.PATH = p1.join(";");
+    if (argv.verbose) {
+        console.log("reordered path: ", p1)
+    }
 }
 
-function createErrorPromise(errmsg) {
-    return new Promise(function (resolve, reject) {
-        reject(errmsg);
+function managedSolrAdjustEnv(cb) {
+    if (!argv.managesolr) {
+        cb();
+        return;
+    }
+    if (os.platform() == 'win32' && process.env.JAVA_HOME && process.env.JAVA_HOME.startsWith('/')) {
+        console.log("trying to fix JAVA_HOME")
+        if (commandExists.sync('cygpath')) {
+            // because we are running under cygwin, we need to reorder the paths so that the windows paths come first
+            // and cygwin's find.exe does not shadow win32's.
+            reorder_cygwin_paths(managedSolrEnv);
+
+            process.env.JAVA_HOME = undefined
+            javahome(function(err, home){
+                if(err) {
+                    cb(err)
+                } else {
+                    console.log("found JAVA_HOME: " + home);
+                    process.env.JAVA_HOME = home
+                    cb()
+                }
+            });
+            return;
+
+            // var jh = child_process.spawnSync('cygpath', ['-w', process.env.JAVA_HOME]).stdout.toString()
+            // console.log("using JAVA_HOME=" + jh)
+            // managedSolrEnv.JAVA_HOME = jh;
+
+        }
+    }
+    cb()
+}
+execStack.push(managedSolrAdjustEnv);
+
+function managedSolrStop(cb) {
+    if (!argv.managesolr || fs.existsSync(managedSolrSetupDoneFlag) || !fs.existsSync(path.join(managedSolrBinPath, managedSolrCmdScript))) {
+        cb();
+        return;
+    }
+    console.log("Checking for a running instance...")
+
+    waitPort({host: managedSolrHostName, port: managedSolrPort, timeout: 3000, output: "silent"}).then(function(err) {
+        if (!err) {
+            console.log("Stopping Solr...")
+            try {
+                child_process.execSync(managedSolrCmdScript + " stop -all", {cwd: managedSolrBinPath, env: managedSolrEnv});
+            } catch (err) {
+                console.log("failed to stop instance, let's hope we can continue anyways...")
+            }
+        }
+        cb()
+    }, function() {
+        console.log("Port " + managedSolrPort + " is not open, Solr seems to be not running")
+        cb()
+    });
+}
+execStack.push(managedSolrStop);
+
+function managedSolrInstall(cb) {
+    if (!argv.managesolr || fs.existsSync(managedSolrSetupDoneFlag)) {
+        cb();
+        return;
+    }
+    console.log("Unpacking solr to: " + managedSolrPath)
+    if (fs.existsSync(managedSolrPath)) {
+        fs.rmdirSync(managedSolrPath, {recursive: true, maxRetries: 10, retryDelay: 1000})
+    }
+    var tmpd = path.join(buildRoot, ".unpack_tmp");
+    if (fs.existsSync(tmpd)) {
+        fs.rmdirSync(tmpd, {recursive: true, maxRetries: 10, retryDelay: 1000})
+    }
+    extract(managedSolrZip, { dir: tmpd }).then(function() {
+        fs.renameSync(path.join(tmpd, "solr-" + managedSolrVersion), managedSolrPath)
+        fs.rmdirSync(tmpd, {recursive: true, maxRetries: 10, retryDelay: 1000})
+        cb()
+    })    
+}
+execStack.push(managedSolrInstall);
+
+function managedSolrPostInstall(cb) {
+    if (!argv.managesolr || fs.existsSync(managedSolrSetupDoneFlag)) {
+        cb();
+        return;
+    }
+
+    const jettyXml = path.join(managedSolrPath, "server", "etc", "jetty.xml")
+    var xml = fs.readFileSync(jettyXml).toString()
+
+    if(false) {
+        var scriptSrc = `http://${argv.servername}:${argv.serverport}`
+        console.log("Adding " + scriptSrc + " to script-src in: " + jettyXml)
+        xml = xml.replace(/(script-src 'self')/, `script-src ${scriptSrc} 'self'`)
+    }
+
+    console.log("Removing X-Content-Type-Options header, you have been warned!")
+    xml = xml.replace(/X-Content-Type-Options/, `X-GTFO`)
+
+    fs.writeFileSync(jettyXml, xml)
+
+    //build/solr/server/solr-webapp/webapp/WEB-INF/web.xml
+    /**
+    <filter>
+    <filter-name>cross-origin</filter-name>
+    <filter-class>org.eclipse.jetty.servlets.CrossOriginFilter</filter-class>
+</filter>
+<filter-mapping>
+    <filter-name>cross-origin</filter-name>
+    <url-pattern>/*</url-pattern>
+</filter-mapping>
+ */
+    //cp build/solr/server/lib/jetty-servlets-9.4.34.v20201102.jar build/solr/server/solr-webapp/webapp/WEB-INF/lib/
+    //build/solr/server/solr/configsets/_default/conf/solrconfig.xml
+
+    cb()
+}
+execStack.push(managedSolrPostInstall);
+
+function managedSolrStart(cb) {
+    if (!argv.managesolr) {
+        cb();
+        return;
+    }
+    console.log("Starting Solr...")
+    // on windows the solr start command does not properly detach, so we have to keep the process attached
+    // or kill the server instantly
+    child_process.exec(managedSolrCmdScript + " start", {cwd: managedSolrBinPath, env: managedSolrEnv});
+    waitPort({host: managedSolrHostName, port: managedSolrPort}).then(function() {
+        cb()
+    });
+}
+execStack.push(managedSolrStart);
+
+var solrClient = undefined;
+execStack.push(function(cb) {
+    if (argv.verbose) {
+        console.log("creating solr client")
+    }
+    solrClient = solr.createClient({core : solrCoreName})
+    cb()
+});
+
+function managedSolrSetup(cb) {
+    if (!argv.managesolr || fs.existsSync(managedSolrSetupDoneFlag)) {
+        cb();
+        return;
+    }
+    console.log("Setting up Solr core: " + solrCoreName)
+    child_process.execSync(managedSolrCmdScript + " create_core -c " + solrCoreName, {cwd: managedSolrBinPath, env: managedSolrEnv});
+    cb()
+}
+execStack.push(managedSolrSetup);
+
+// wait for core to come online
+execStack.push(function(cb) {
+    if (argv.verbose) {
+        console.log("waiting for service")
+    }
+    async.retry({times: 30, interval: 1000}, function(cb2) {
+        solrClient.ping(function(err,obj){
+            if(err){
+                cb2(err)
+            }else{
+                console.log("ping OK")
+                cb2()
+            }
+        });
+    }, function(err, result) {
+        if(err) {cb("service ping failed: "+err)} else {cb()}
+    });
+});
+
+function managedSolrSetup2(cb) {
+    if (!argv.managesolr || fs.existsSync(managedSolrSetupDoneFlag)) {
+        cb();
+        return;
+    }
+
+    // we are using dynamic configuration. So whatever data we throw at Solr, the first instance it sees for a particular
+    // field, that's the type it will assume for that field henceforth. If our first submission would be "123" as the body
+    // of a note, the type would be a number. For that reason we are now implicitly forcing the desired field types by
+    // submitting a proper example note
+    /** @type {INote} */
+    var note = {
+        id: "20200101T202020.txt",
+        text: "some proper English\nmulti-line\ntext.",
+        created_dt: new Date().toISOString(),
+        lmod_dt: new Date().toISOString(),
+    }
+    async.series([
+        function(cb2) {
+            solrClient.add(note, function(err,obj) {
+                if(err) {cb2(err)} else {cb2()}
+            })
+        },
+        function(cb2) {
+            solrClient.softCommit(function(err,obj) {
+                if(err) {cb2(err)} else {cb2()}
+            })
+        },
+        function(cb2) {
+            solrClient.deleteAll(function(err,obj) {
+                if(err) {cb2(err)} else {cb2()}
+            })
+        },
+        function(cb2) {
+            solrClient.softCommit(function(err,obj) {
+                if(err) {cb2(err)} else {cb2()}
+            })
+        },
+    ],
+    function(err,result) {
+        if(err) {cb(err)}
+        else {
+            fs.writeFileSync(managedSolrSetupDoneFlag, "")
+            console.log("Solr setup finished.")
+            cb()
+        }
     })
 }
+execStack.push(managedSolrSetup2);
+
+
+
+
+
+execStack.push(function(cb) {
+    if (argv.reset) {
+        console.log("Clearing index...")
+        solrClient.deleteAll(function(err, obj){
+            if (err) {
+                cb(err)
+            } else {
+                cb()
+            }
+        })
+    } else {
+        cb()
+    }
+})
+
+execStack.push(function(cb) {
+    if (argv.reset) {
+        console.log("Soft-committing changes...")
+        solrClient.softCommit(function(err, obj){
+            if (err) {
+                cb(err)
+            } else {
+                cb()
+            }
+        })
+    } else {
+        cb()
+    }
+})
 
 var submitToIndex = function (noteId, doSync=false) {
     return new Promise(function (resolve, reject) {
         if(argv.verbose)
             console.log("adding to index: " + noteId);
         // use relative url-ized path as id
+        /** @type {INote} */
         var note;
         try {
             note = loadNote(noteId);
@@ -146,13 +451,13 @@ var submitToIndex = function (noteId, doSync=false) {
         if (note.lmod_dt === void 0) {
             note.lmod_dt = note.created_dt;
         }
-        client.add(note, function(err,obj){
+        solrClient.add(note, function(err,obj){
             if(err) {
-                console.log("failed to update index: ", err);
+                console.log("failed to update index: ", err, " -- note was: ", note);
                 reject("failed to update index");
             } else {
                 if (doSync) {
-                    client.softCommit(function(err,res) {
+                    solrClient.softCommit(function(err,res) {
                         if(err) {
                             console.log("index softCommit failed: ", err);
                             reject("index softCommit failed");
@@ -168,16 +473,22 @@ var submitToIndex = function (noteId, doSync=false) {
     })
 }
 
-if (!argv.skipimport) {
+// import note repository
+execStack.push(function (cb) {
+    if (argv.skipimport) {
+        cb()
+        return
+    }
+
     // recurse repo/ dir and find files to add to the index
-    var filelist = glob.sync('**', {cwd: repoRoot, follow: false, nodir: true});
+    var filelist = glob.sync('**', {cwd: argv.reporoot, follow: false, nodir: true});
 
     // remove too large files
     if (argv.maxfilesize > 0) {
         var _filelist = [];
         for (var i=0; i<filelist.length; i++) {
             var fn = filelist[i];
-            var stat = fs.statSync(path.join(repoRoot, fn));
+            var stat = fs.statSync(path.join(argv.reporoot, fn));
             if (!stat) {
                 throw Error("stat failed for " + fn);
             }
@@ -205,27 +516,60 @@ if (!argv.skipimport) {
     pool.start()
     .then(function () {
         // make sure the changes to the index are made visible ...
-        client.commit(function() {
-            console.log("Added " + filelist.length + " files to the index.");
-            filelist = null;
-            // ... before finally starting the server port
-            startApp();
-        }, function (error) {
-            throw error;
+        solrClient.commit(function(err, obj) {
+            if (err) {
+                cb(err)
+            } else {
+                console.log("Added " + filelist.length + " files to the index.");
+                filelist = null;
+                cb()
+            }
         });
+    }, function (err) {
+        cb(err)
     });
-} else {
-    startApp();
-}
+})
 
+//--------------------------------------------------------------------------
+// express
+var app = undefined
+var nunjucksEnv = undefined
 
-if (argv.livereload) {
+execStack.push(function (cb) {
+    if (argv.stopafterimport) {
+        cb("stop-after-import")
+        return
+    }
+
+    app = express()
+    nunjucksEnv = nunjucks.configure('views', {
+        autoescape: true,
+        express: app
+    });
+
+    nunjucksEnv.addGlobal('prod', argv.prod);
+        app.listen(argv.serverport, argv.servername, () => {
+        console.log(`Listening at http://${argv.servername}:${argv.serverport}`)
+        cb()
+    })
+});
+
+//--------------------------------------------------------------------------
+// live-reload
+const livereload = require("livereload");
+const connectLivereload = require("connect-livereload");
+
+execStack.push(function (cb) {
+    if (!argv.livereload) {
+        cb()
+        return
+    }
+
     if (argv.prod && !argv.force) {
         console.log("refusing to use live-reload in prod, aborting...");
-        exit(1);
+        cb('prod !force')
+        return
     }
-    const livereload = require("livereload");
-    const connectLivereload = require("connect-livereload");
 
     // open livereload high port and start to watch public directory for changes
     const liveReloadServer = livereload.createServer();
@@ -239,12 +583,24 @@ if (argv.livereload) {
     });
 
     app.use(connectLivereload());
-}
+});
 
-if (argv.logging) {
+
+//--------------------------------------------------------------------------
+// logging
+execStack.push(function (cb) {
+    if (!argv.logging) {
+        cb()
+        return
+    }
+
     const morgan = require('morgan');
     app.use(morgan('dev'));
-}
+    cb()
+})
+
+//--------------------------------------------------------------------------
+// note rest CRUD
 
 const noteEol = "\n";
 const noteLmodHeader = "Last-Modified";
@@ -252,16 +608,20 @@ const noteCreatedHeader = "Created";
 
 // create note editor session id -> successfully created note id and timestamp for cleanup
 var createSessionIds = new Map();
-var createSessionIdStaleSecs = 12;
-var createSessionIdsPruner = function() {
-    var now = new Date().getTime()/1000;
-    createSessionIds.forEach(function(value, key) {
-        if ((now - value.created) > createSessionIdStaleSecs) {
-            createSessionIds.delete(key);
-        }
-    })
-}
-var createSessionIdsPrunerIval = setInterval(createSessionIdsPruner, createSessionIdStaleSecs/3 * 1000);
+
+execStack.push(function (cb) {
+    var createSessionIdStaleSecs = 12;
+    var createSessionIdsPruner = function() {
+        var now = new Date().getTime()/1000;
+        createSessionIds.forEach(function(value, key) {
+            if ((now - value.created) > createSessionIdStaleSecs) {
+                createSessionIds.delete(key);
+            }
+        })
+    }
+    var createSessionIdsPrunerIval = setInterval(createSessionIdsPruner, createSessionIdStaleSecs/3 * 1000);
+    cb()
+})
 
 // for now, only use sync ops when storing the note to avoid having to deal with concurrency issues for no reason
 function createUniqueNoteId(sessionId) {
@@ -276,7 +636,7 @@ function createUniqueNoteId(sessionId) {
     noteId = noteId.replace(/[^T0-9]/g, '');
     var noteIdExt = noteId + noteSuffix;
     var i = 0;
-    while (fs.existsSync(path.join(repoRoot, noteIdExt))) {
+    while (fs.existsSync(path.join(argv.reporoot, noteIdExt))) {
         noteIdExt = noteId + "_" + i++ + noteSuffix;
     }
     createSessionIds.set(sessionId, {noteId: noteIdExt, created: new Date().getTime()/1000});
@@ -317,9 +677,15 @@ function isValidNoteIdFormat(noteId) {
     return /^[0-9_A-Za-z./-]+$/.test(noteId) && !/\.\./.test(noteId) && !/\/$/.test(noteId) && !/\/\./.test(noteId);
 }
 
+/**
+ * 
+ * @param {string} noteId 
+ * @returns {INote}
+ */
 function loadNote(noteId) {
-    var note = {id: noteId};
-    var data = fs.readFileSync(path.join(repoRoot, noteId)).toString();
+    /** @type {INote} */
+    var note = {id: noteId, text: undefined, created_dt: undefined, lmod_dt: undefined};
+    var data = fs.readFileSync(path.join(argv.reporoot, noteId)).toString();
     var sepOffset = data.indexOf("\n\n");
     if (sepOffset == -1) {
         throw Error("no header found: " + noteId);
@@ -359,187 +725,211 @@ function loadNote(noteId) {
     return note;
 }
 
-// http://expressjs.com/en/api.html
-app.use(express.json());
-app.param('noteId', function (req, res, next, noteId) {
-    if (!isValidNoteIdFormat(noteId)) {
-        res.status(500).end();
-        return;
-    }
-    res.locals.noteId = noteId;
-    next()
-})
-app.param('sessionId', function (req, res, next, sessionId) {
-    if (!sessionId || sessionId.length < 5) {
-        res.status(500).end();
-        return;
-    }
-    res.locals.sessionId = sessionId;
-    next()
-})
-app.post('/c/:sessionId', express.json(), function (req, res){  
-    res.contentType = 'application/json';
-    var reply = {status: 0, error: ''};
-    var note = req.body.note;
-    note.id = createUniqueNoteId(res.locals.sessionId);
-    note.created_dt = new Date().toISOString();
-    var onDiskData;
-    try {
-        onDiskData = cvtNoteToOnDiskFormat(note);
-    } catch(e) {
-        console.log(e);
-        reply.status = 2;
-        reply.error = e;
-        res.status(500).send(JSON.stringify(reply)).end();
-        return;
-    }
-    try {
-        fs.writeFileSync(path.join(repoRoot, note.id), onDiskData);
-    } catch(e) {
-        console.log(e);
-        reply.status = 2;
-        reply.error = "failed to write note to disk";
-        res.status(500).send(JSON.stringify(reply)).end();
-        return;
-    }
-    // set note id on client after the note has been saved to disk.
-    // this allows for an immediate retry to update the index if the index submission failed.
-    reply.noteId = note.id;
 
-    submitToIndex(note.id, true).then(function() {
-            res.send(JSON.stringify(reply)).end();
-        }, function(error) {
-            reply.status = 2;
-            reply.error = error;
-            res.status(500).send(JSON.stringify(reply)).end();
+
+execStack.push(function (cb) {
+    // http://expressjs.com/en/api.html
+    app.use(express.json());
+    app.param('noteId', function (req, res, next, noteId) {
+        if (!isValidNoteIdFormat(noteId)) {
+            res.status(500).end();
+            return;
         }
-    );
- });
- app.get('/r/:noteId', express.json(), function (req, res){  
-    var noteId = res.locals.noteId;
-    res.contentType = 'application/json';
-    var reply = {status: 0, error: ''};
-    if (!fs.existsSync(path.join(repoRoot, noteId))) {
-        reply.status = 1;
-        res.status(404).send(JSON.stringify(reply)).end();
-        return;
-    }
-    try {
-        reply.note = loadNote(noteId);
-    } catch (e) {
-        if (argv.verbose) {
+        res.locals.noteId = noteId;
+        next()
+    })
+    app.param('sessionId', function (req, res, next, sessionId) {
+        if (!sessionId || sessionId.length < 5) {
+            res.status(500).end();
+            return;
+        }
+        res.locals.sessionId = sessionId;
+        next()
+    })
+    app.post('/c/:sessionId', express.json(), function (req, res){  
+        res.contentType = 'application/json';
+        /** @type {ICreateNoteServerResponse} */
+        var reply = {status: 0, error: '', noteId: undefined};
+        var note = req.body.note;
+        note.id = createUniqueNoteId(res.locals.sessionId);
+        note.created_dt = new Date().toISOString();
+        var onDiskData;
+        try {
+            onDiskData = cvtNoteToOnDiskFormat(note);
+        } catch(e) {
             console.log(e);
-        }
-        reply.status = 1;
-        res.status(500).send(JSON.stringify(reply)).end();
-        return;
-    }
-    res.send(JSON.stringify(reply)).end();
-});
-app.post('/u/', express.json(), function (req, res){  
-    res.contentType = 'application/json';
-    var reply = {status: 0, error: ''};
-    var noteId = req.body.note.id;
-
-    var note;
-    try {
-        note = loadNote(noteId);
-    } catch (e) {
-        if (argv.verbose) {
-            console.log(e);
-        }
-        reply.status = 1;
-        res.status(500).send(JSON.stringify(reply)).end();
-        return;
-    }
-
-    note.text = req.body.note.text;
-    note.lmod_dt = new Date().toISOString();
-    var onDiskData;
-    try {
-        onDiskData = cvtNoteToOnDiskFormat(note);
-    } catch(e) {
-        console.log(e);
-        reply.status = 2;
-        reply.error = e;
-        res.status(500).send(JSON.stringify(reply)).end();
-        return;
-    }
-    try {
-        fs.writeFileSync(path.join(repoRoot, note.id), onDiskData);
-    } catch(e) {
-        console.log(e);
-        reply.status = 2;
-        reply.error = "failed to write note to disk";
-        res.status(500).send(JSON.stringify(reply)).end();
-        return;
-    }
-
-    submitToIndex(note.id, true).then(function() {
-            res.send(JSON.stringify(reply)).end();
-        }, function(error) {
             reply.status = 2;
-            reply.error = error;
+            reply.error = e;
             res.status(500).send(JSON.stringify(reply)).end();
+            return;
         }
-    );
-});
-app.post('/d/:noteId', express.json(), function (req, res){  
-    var noteId = res.locals.noteId;
-    res.contentType = 'application/json';
-    var reply = {status: 0, error: ''};
+        try {
+            fs.writeFileSync(path.join(argv.reporoot, note.id), onDiskData);
+        } catch(e) {
+            console.log(e);
+            reply.status = 2;
+            reply.error = "failed to write note to disk";
+            res.status(500).send(JSON.stringify(reply)).end();
+            return;
+        }
+        // set note id on client after the note has been saved to disk.
+        // this allows for an immediate retry to update the index if the index submission failed.
+        reply.noteId = note.id;
 
-    var np = path.join(repoRoot, noteId);
-    client.deleteByID(noteId, function(err,solrRes) {
-        if(err) {
-            console.log("index delete failed: ", err, solrRes);
-            reply.error = "index removal failed";
+        submitToIndex(note.id, true).then(function() {
+                res.send(JSON.stringify(reply)).end();
+            }, function(error) {
+                reply.status = 2;
+                reply.error = error;
+                res.status(500).send(JSON.stringify(reply)).end();
+            }
+        );
+    });
+    app.get('/r/:noteId', express.json(), function (req, res){  
+        var noteId = res.locals.noteId;
+        res.contentType = 'application/json';
+        /** @type {IRetrieveNoteServerResponse} */
+        var reply = {status: 0, error: '', note: undefined};
+        if (!fs.existsSync(path.join(argv.reporoot, noteId))) {
             reply.status = 1;
-            res.status(500);
-            res.send(JSON.stringify(reply)).end();
-        } else {
-            client.softCommit(function(err2,solrRes2) {
-                if(err2) {
-                    console.log("index softCommit failed: ", err2, solrRes2);
-                    reply.error = "index softCommit failed";
-                } else {
-                    if (fs.existsSync(np)) {
-                        try {
-                            fs.unlinkSync(np);
-                        } catch (err3) {
-                            console.log("disk delete failed: ", err3);
-                            reply.error = "deletion failed";
+            res.status(404).send(JSON.stringify(reply)).end();
+            return;
+        }
+        try {
+            reply.note = loadNote(noteId);
+        } catch (e) {
+            if (argv.verbose) {
+                console.log(e);
+            }
+            reply.status = 1;
+            res.status(500).send(JSON.stringify(reply)).end();
+            return;
+        }
+        res.send(JSON.stringify(reply)).end();
+    });
+    app.post('/u/', express.json(), function (req, res){  
+        res.contentType = 'application/json';
+        /** @type {INoteServerResponse} */
+        var reply = {status: 0, error: ''};
+        var noteId = req.body.note.id;
+
+        /** @type {INote} */
+        var note;
+        try {
+            note = loadNote(noteId);
+        } catch (e) {
+            if (argv.verbose) {
+                console.log(e);
+            }
+            reply.status = 1;
+            res.status(500).send(JSON.stringify(reply)).end();
+            return;
+        }
+
+        note.text = req.body.note.text;
+        note.lmod_dt = new Date().toISOString();
+        var onDiskData;
+        try {
+            onDiskData = cvtNoteToOnDiskFormat(note);
+        } catch(e) {
+            console.log(e);
+            reply.status = 2;
+            reply.error = e;
+            res.status(500).send(JSON.stringify(reply)).end();
+            return;
+        }
+        try {
+            fs.writeFileSync(path.join(argv.reporoot, note.id), onDiskData);
+        } catch(e) {
+            console.log(e);
+            reply.status = 2;
+            reply.error = "failed to write note to disk";
+            res.status(500).send(JSON.stringify(reply)).end();
+            return;
+        }
+
+        submitToIndex(note.id, true).then(function() {
+                res.send(JSON.stringify(reply)).end();
+            }, function(error) {
+                reply.status = 2;
+                reply.error = error;
+                res.status(500).send(JSON.stringify(reply)).end();
+            }
+        );
+    });
+    app.post('/d/:noteId', express.json(), function (req, res){  
+        var noteId = res.locals.noteId;
+        res.contentType = 'application/json';
+        /** @type {INoteServerResponse} */
+        var reply = {status: 0, error: ''};
+
+        var np = path.join(argv.reporoot, noteId);
+        solrClient.deleteByID(noteId, function(err,solrRes) {
+            if(err) {
+                console.log("index delete failed: ", err, solrRes);
+                reply.error = "index removal failed";
+                reply.status = 1;
+                res.status(500);
+                res.send(JSON.stringify(reply)).end();
+            } else {
+                solrClient.softCommit(function(err2,solrRes2) {
+                    if(err2) {
+                        console.log("index softCommit failed: ", err2, solrRes2);
+                        reply.error = "index softCommit failed";
+                    } else {
+                        if (fs.existsSync(np)) {
+                            try {
+                                fs.unlinkSync(np);
+                            } catch (err3) {
+                                console.log("disk delete failed: ", err3);
+                                reply.error = "deletion failed";
+                            }
                         }
                     }
-                }
-                if (reply.error) {
-                    reply.status = 1;
-                    res.status(500);
-                }
-                res.send(JSON.stringify(reply)).end();
-            });
-        }
+                    if (reply.error) {
+                        reply.status = 1;
+                        res.status(500);
+                    }
+                    res.send(JSON.stringify(reply)).end();
+                });
+            }
+        });
     });
-});
-if (argv.prod) {
-    app.get('*.js', express.static(path.join(__dirname, "build")))
-    app.get('*.css', express.static(path.join(__dirname, "build")))
-} else {
-    app.get('*.js', express.static(path.join(__dirname, "src")))
-    app.get('*.css', express.static(path.join(__dirname, "css")))
+    if (argv.prod) {
+        app.get('*.js', express.static(buildRoot))
+        app.get('*.css', express.static(buildRoot))
+    } else {
+        app.get('*.js', express.static(path.join(__dirname, "src")))
+        app.get('*.css', express.static(path.join(__dirname, "css")))
+    }
+    app.get('*.gif', express.static(path.join(__dirname, "images")))
+    app.get('*.ico', express.static(buildRoot))
+    app.get('/getSolrConfig', express.json(), function (req, res){  
+        res.contentType = 'application/json';
+        /** @type {GetSolrConfigResponse} */
+        var reply = {status: 0, error: '', solrUrl: argv.solrUrl};
+        res.send(JSON.stringify(reply)).end();
+    });
+
+    // index.html gets rendered through a templating engine so we can switch javascript loading
+    // from dev to prod via command line switch
+    // https://mozilla.github.io/nunjucks/templating.html
+    app.get('/', function(req, res) {
+        res.render('index.html');
+    });
+
+    cb()
+})
+
+
+if(argv.verbose) {
+    console.log("Processing exec stack...")
 }
-app.get('*.gif', express.static(path.join(__dirname, "images")))
-app.get('*.ico', express.static(path.join(__dirname, "build")))
-app.get('/getSolrConfig', express.json(), function (req, res){  
-    res.contentType = 'application/json';
-    /** @type {GetSolrConfigResponse} */
-    var reply = {status: 0, error: '', solrUrl: argv.solrUrl};
-    res.send(JSON.stringify(reply)).end();
+
+async.series(execStack, function(err){
+    if(err) {
+        throw err
+    }
 });
 
-// index.html gets rendered through a templating engine so we can switch javascript loading
-// from dev to prod via command line switch
-// https://mozilla.github.io/nunjucks/templating.html
-app.get('/', function(req, res) {
-    res.render('index.html');
-});
+
