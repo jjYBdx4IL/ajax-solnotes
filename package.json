@@ -6,6 +6,7 @@
   "dependencies": {
     "async": "^3.2.0",
     "command-exists": "^1.2.9",
+    "dlcache": "^0.9.0",
     "es6-promise-pool": "^2.5.0",
     "express": "^4.17.1",
     "extract-zip": "^2.0.1",
@@ -15,7 +16,7 @@
     "nunjucks": "^3.2.3",
     "open": "^8.0.7",
     "solr-client": "^0.8.0",
-    "wait-port": "^0.2.9",
+    "wait-on": "^5.3.0",
     "yargs": "^16.2.0"
   },
   "devDependencies": {
@@ -31,9 +32,9 @@
     "@types/jquery": "^3.5.5",
     "@types/livereload": "^0.9.0",
     "@types/nunjucks": "^3.1.4",
-    "@types/open": "^6.2.1",
     "@types/solr-client": "^0.7.4",
     "@types/uglify-js": "^3.13.0",
+    "@types/wait-on": "^5.2.0",
     "@types/yargs": "^16.0.1",
     "connect-livereload": "^0.6.1",
     "got": "^11.8.2",
@@ -44,10 +45,7 @@
     "uglifycss": "^0.0.29"
   },
   "scripts": {
-    "ci": "start-server-and-test ci-start-server http://127.0.0.1:3007/ ci-test",
-    "ci-start-server": "node server.js --managesolr --portinc 7 -v --logging",
-    "ci-test": "node test.js --portinc 7",
-    "test": "node test.js",
+    "test": "node test.js --portinc 7",
     "dev": "nodemon -w server.js server.js -- --skipimport --logging --livereload --managesolr --portinc 6 -v --openurl",
     "qa": "node server.js --prod --logging --managesolr --portinc 6 -v",
     "prod": "node server.js --prod",
@@ -56,6 +54,6 @@
     "managed": "node server.js --prod --managesolr"
   },
   "author": "",
-  "types": "check.d.ts",
+  "types": "src/types/*.d.ts",
   "license": "ISC"
 }

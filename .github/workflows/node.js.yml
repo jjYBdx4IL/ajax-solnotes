@@ -28,8 +28,8 @@ jobs:
       if: always()
       with:
         path: |
-          ./cache
-        key: solr882.zip
+          ~/.cache/dlcache
+        key: solr882.zip.2
     # https://github.com/marketplace/actions/setup-java-jdk
     - uses: actions/setup-java@v2
       with:
@@ -39,11 +39,8 @@ jobs:
       uses: actions/setup-node@v2
       with:
         node-version: ${{ matrix.node-version }}
-    - run: install -d cache
-    - run: if ! test -e cache/solr.zip; then wget -O cache/solr.zip https://archive.apache.org/dist/lucene/solr/8.8.2/solr-8.8.2.zip; fi
-    - run: cp -fv cache/solr.zip .
     - run: npm install
-    - run: npm run ci
+    - run: npm run test
     - run: cat solr/server/logs/*
       if: always()
 

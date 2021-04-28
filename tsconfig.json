@@ -18,11 +18,12 @@
     },
     "include": [
         "src/*",
-        "lib.d.ts",
+        "src/client/*",
+        "src/server/*",
+        "src/types/*.d.ts",
         "./*.js"
     ],
     "exclude": [
-        "build",
-        "client_old.js"
+        "build"
     ],
 }

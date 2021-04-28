@@ -17,7 +17,11 @@ console.log(scripts)
 
 var input = '';
 scripts.forEach(function(script, _key, _hl) {
-    input += fs.readFileSync(path.join(__dirname, "src", script), "utf8")
+    try {
+        input += fs.readFileSync(path.join(__dirname, "src", "client", script), "utf8")
+    } catch (e) {
+        input += fs.readFileSync(path.join(__dirname, "src", script), "utf8")
+    }
 })
 
 if (!fs.existsSync(path.join(__dirname, "build"))) {
