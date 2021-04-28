@@ -85,8 +85,8 @@ a:hover {
 }
 
 #editor .textcontent {
-  flex: 1 0 auto;
-  display: inline;
+  flex: 1 0 !important;
+  overflow: auto;
 } 
 
 #editor {

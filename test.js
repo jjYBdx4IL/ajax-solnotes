@@ -87,7 +87,7 @@ function rm(_path) {
         });
         input.dispatchEvent(event);
     `);
-    await waitFor(function() {
+    await waitFor(() => {
         var content = dom.window.document.querySelector('#docs').textContent;
         console.log("text content: " + content);
         return content.includes("takeout-test-title")
