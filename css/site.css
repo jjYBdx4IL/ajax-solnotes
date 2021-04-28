@@ -183,18 +183,16 @@ a:hover {
 }
 
 
+/* https://jsfiddle.net/xkpw6hob/ */
 .grid {
-  /*background: #EEE;*/
   width: 95%;
   margin-left: 40px;
-  margin-right: 40px;
-  position: relative;
+  display: flex;
 }
 
-.grid:after {
-  content: '';
-  display: block;
-  clear: both;
+.grid-column {
+  flex: 1 1 0;
+  overflow: hidden;
 }
 
 .grid-item {
@@ -205,19 +203,10 @@ a:hover {
   transition-duration: .218s;
   transition-property: opacity,transform;
   transition-timing-function: ease-in;
-  margin: 16px;
-  width: 120px;
-  float: left;
   border: 2px solid #5f6368;
   border-radius: 5px;
-  margin: 8px;
+  margin: 12px 6px;
   padding: 16px;
-  position: absolute;
-}
-
-@media screen and (min-width: 768px) {
-  /* larger screens */
-  .grid .grid-item { width: 238px; }
 }
 
 .grid-item-textcontent {

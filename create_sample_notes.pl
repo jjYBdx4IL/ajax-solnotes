@@ -25,14 +25,17 @@ print "words discovered: ", scalar @words, "\n";
 for (my $i = 0; $i < ($ARGV[0] || 10000); $i++) {
     my $totalLen = 40+rand()*rand()*2000;
     my $output = "Created: $t\n\n";
+    my $newline = 1;
     while (length($output) < $totalLen) {
-        if(length($output) > 0) {
+        if(!$newline) {
             $output .= " ";
         }
         $output .= $words[int(rand()*(scalar @words))];
+        $newline = 0;
         if (rand() > 0.8) {
             $output .= "\n";
+            $newline = 1;
         }
     }
-    write_file("repo/$i.txt", $output);
+    write_file("repo/20210304T$i.txt", $output);
 }

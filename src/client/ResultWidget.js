@@ -6,11 +6,10 @@ const ResultWidget = class extends Widget {
     constructor(container) {
         super(container);
     }
-    /** @type {number[]} column height */
-    colMaxY = [];
-    /** element (column) width */
-    elw = 0;
+    currentColCount = 0;
     maxPreviewLength = 700;
+    minColCount = 3;
+    desiredColWidth = 240;
 
     /**
      * 
@@ -26,7 +25,7 @@ const ResultWidget = class extends Widget {
 
         if (start == 0) {
             $(this.container).empty();
-            this.colMaxY = []; // force column re-layout
+            this.currentColCount = 0; // force column re-layout
         }
 
         for (var i = 0, l = res.response.docs.length; i < l; i++) {
@@ -50,38 +49,44 @@ const ResultWidget = class extends Widget {
         return bottomOverShoot < window.innerHeight;
     }
 
+    desiredColCount() {
+        
+        return Math.max(this.minColCount, Math.floor($(this.container).width() / this.desiredColWidth));
+    }
+
     /**
      * has the target width changed so much that we have a new column count?
      * @returns {boolean}
      */
     needsColumnRelayout() {
-        var ncols = Math.max(3, Math.floor($(this.container).width() / this.elw));
-        return ncols != this.colMaxY.length;
+        return this.desiredColCount() != this.currentColCount;
     }
 
     append(noteDiv) {
-        $(this.container).append(noteDiv);
-
-        if (!this.colMaxY.length) {
-            this.elw = noteDiv.outerWidth() + parseInt(noteDiv.css('margin-left')) + parseInt(noteDiv.css('margin-right'));
-            var ncols = Math.max(3, Math.floor($(this.container).width() / this.elw));
-            if (DEBUG) console.log("v = ", this.elw);
-            for (var i = 0; i < ncols; i++) {
-                this.colMaxY.push(0);
+        if (!this.currentColCount) {
+            this.currentColCount = this.desiredColCount()
+            if (DEBUG) console.log("ncols = " + this.currentColCount)
+            for (var i = 0; i < this.currentColCount; i++) {
+                $(this.container).append('<div class="grid-column"></div>')
             }
         }
 
         // find column with most free space at bottom
-        var i = 0;
-        for (var j = 1; j < this.colMaxY.length; j++) {
-            if (this.colMaxY[j] < this.colMaxY[i]) {
-                i = j;
+        var i = 0
+        var minHeight = -1
+        var smallestCol = undefined
+        $(this.container).children().each((j, col) => {
+            var l = $(col).children().last()
+            const h = l.length ? l.position().top + l.outerHeight() : 0
+            if (h < minHeight || minHeight < 0) {
+                minHeight = h
+                i = j
+                smallestCol = col
             }
-        }
+        })
 
         // and append the element to it
-        noteDiv.css({ top: this.colMaxY[i], left: i * this.elw });
-        this.colMaxY[i] += noteDiv.outerHeight() + parseInt(noteDiv.css('margin-top')) + parseInt(noteDiv.css('margin-bottom'));
+        $(smallestCol).append(noteDiv);
     }
 
     /** @param {string} noteText */

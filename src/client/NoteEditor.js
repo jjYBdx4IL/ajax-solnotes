@@ -93,6 +93,9 @@ const NoteEditor = class {
             return null;
         }
         text = he.decode(text);
+        if (text == '') {
+            text += "\n"
+        }
         return text;
     }
 

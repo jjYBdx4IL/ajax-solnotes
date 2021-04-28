@@ -67,7 +67,7 @@ const urlifyRegex = new RegExp("(((?:(http|https|Http|Https|rtsp|Rtsp):\\/\\/(?:
 + "(?:\\b|$))", "g");  
 /** @param {string} text  @returns {string} */
 function urlify(text) {
-  return text.replaceAll(urlifyRegex, '<div class="link">$1</a>');
+  return text.replaceAll(urlifyRegex, '<div class="link">$1</div>');
 }
 //console.log("test:"+urlify("https://www.google.de http://www.bla.de"));
 const deurlifyRegex = new RegExp("<div class=\"link\">([^<>]+)</div>", "g");
