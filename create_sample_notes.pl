@@ -7,7 +7,11 @@ use POSIX qw(strftime);
 use File::Slurp qw(read_file write_file);
 
 my $now = time();
-my $t = strftime('%Y-%m-%dT%H:%M:%S.000Z', gmtime($now));
+sub header {
+    my $i = shift;
+    my $t = strftime('%Y-%m-%dT%H:%M:%S.000Z', gmtime($now + $i));
+    return "Created: $t\n\n";
+}
 
 my @files = glob("node_modules/**/*");
 my %words = ();
@@ -22,9 +26,10 @@ my @words = keys %words;
 
 print "words discovered: ", scalar @words, "\n";
 
-for (my $i = 0; $i < ($ARGV[0] || 10000); $i++) {
+my $max = $ARGV[0] || 10000;
+for (my $i = 0; $i < $max; $i++) {
     my $totalLen = 40+rand()*rand()*2000;
-    my $output = "Created: $t\n\n";
+    my $output = header($max-$i);
     my $newline = 1;
     while (length($output) < $totalLen) {
         if(!$newline) {
@@ -37,5 +42,6 @@ for (my $i = 0; $i < ($ARGV[0] || 10000); $i++) {
             $newline = 1;
         }
     }
+    $output .= "\n#$i";
     write_file("repo/20210304T$i.txt", $output);
 }

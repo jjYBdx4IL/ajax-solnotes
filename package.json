@@ -46,7 +46,7 @@
   },
   "scripts": {
     "test": "node test.js --portinc 7",
-    "dev": "nodemon -w server.js server.js -- --skipimport --logging --livereload --managesolr --portinc 6 -v --openurl",
+    "dev": "nodemon -w server.js server.js -- --skipimport --logging --livereload --managesolr --portinc 6 -v",
     "qa": "node server.js --prod --logging --managesolr --portinc 6 -v",
     "prod": "node server.js --prod",
     "minify": "node uglify.js",

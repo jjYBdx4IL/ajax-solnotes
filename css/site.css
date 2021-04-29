@@ -5,7 +5,6 @@
 }
 
 body {
-  background: url(header.gif) repeat-x;
   font-family: 'Roboto',arial,sans-serif;
   font-size: 15px;
 }
@@ -19,9 +18,6 @@ a:link, a:visited, a:hover, a:active, .colorscheme {
   color: #555;
 }
 @media (prefers-color-scheme: dark) {
-    body {
-      background: url(header_dark.gif) repeat-x;
-    }
     a:link, a:visited, a:hover, a:active, .colorscheme {
       background-color: #202124;
       color: #e8eaed;
@@ -35,14 +31,9 @@ a {
   text-decoration: none;
 }
 a:hover {
-  /*color: #000;*/
   text-decoration: underline;
 }
 
-#wrap {
-  width: 1000px;
-  margin: 0px auto;
-}
 .clear {
   clear: both;
 }
@@ -50,18 +41,30 @@ a:hover {
 /* header */
 
 #header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
   height: 90px;
+  padding: 10px 50px;
+  z-index: 1;
+  display: block;
+  background: url(header.gif) repeat-x;
 }
 #header h1 {
-  padding: 20px 0 5px 10px;
+  padding: 0px 0 5px 10px;
   font-size: 20px;
   letter-spacing: -2px;
 }
 #header h2 {
   padding-left: 10px;
-  /*color: #666;*/
   font-size: 14px;
   font-weight: 100;
+}
+@media (prefers-color-scheme: dark) {
+  #header {
+    background: url(header_dark.gif) repeat-x;
+  }
 }
 
 
@@ -105,7 +108,7 @@ a:hover {
   top: 10%;
   height: 70%;
   visibility:hidden;
-  z-index: 1.0;
+  z-index: 3;
   position: fixed;
 }
 
@@ -140,7 +143,7 @@ a:hover {
 .modal {
   display: block;
   position: fixed;
-  z-index: 0.8;
+  z-index: 2;
   left: 0;
   top: 0;
   width: 100%;
@@ -185,8 +188,10 @@ a:hover {
 
 /* https://jsfiddle.net/xkpw6hob/ */
 .grid {
+  top: 90px;
   width: 95%;
   margin-left: 40px;
+  position: absolute;
   display: flex;
 }
 

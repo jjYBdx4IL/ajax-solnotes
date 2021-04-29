@@ -2,14 +2,38 @@
 const ResultWidget = class extends Widget {
     /**
      * @param {string} container .grid
+     * @param {NoteEditor} noteEditor
      */
-    constructor(container) {
+    constructor(container, noteEditor) {
         super(container);
+        this.noteEditor = noteEditor
+        
+        // Grid interaction
+        var self = this
+        $(this.container).on('click', function(evt) { self.onClick(evt) })
     }
+    /** @type {NoteEditor} */
+    noteEditor = undefined
     currentColCount = 0;
     maxPreviewLength = 700;
     minColCount = 3;
     desiredColWidth = 240;
+
+    /**
+     * @param {JQuery.ClickEvent} evt
+     */
+    onClick(evt) {
+        // direct clicks on 'links' have priority
+        if ($(evt.target).hasClass("link")) {
+            window.open($(evt.target).text(), '_blank').focus();
+            return
+        }
+        // else open the note editor
+        var notePreview = evt.target.closest('.grid-item');
+        if (notePreview) {
+            this.noteEditor.openEditor($(notePreview).attr("note-id"));
+        }
+    }
 
     /**
      * 
@@ -17,15 +41,11 @@ const ResultWidget = class extends Widget {
      * @returns 
      */
     update(res) {
-        var q = res.responseHeader.params.q;
-        var rows = parseInt(res.responseHeader.params.rows);
-        var numFound = res.response.numFound;
         var start = res.response.start;
-        var numFoundExact = res.response.numFoundExact;
 
         if (start == 0) {
-            $(this.container).empty();
-            this.currentColCount = 0; // force column re-layout
+            $(this.container).empty()
+            this.relayoutColumns()
         }
 
         for (var i = 0, l = res.response.docs.length; i < l; i++) {
@@ -50,7 +70,6 @@ const ResultWidget = class extends Widget {
     }
 
     desiredColCount() {
-        
         return Math.max(this.minColCount, Math.floor($(this.container).width() / this.desiredColWidth));
     }
 
@@ -62,15 +81,15 @@ const ResultWidget = class extends Widget {
         return this.desiredColCount() != this.currentColCount;
     }
 
-    append(noteDiv) {
-        if (!this.currentColCount) {
-            this.currentColCount = this.desiredColCount()
-            if (DEBUG) console.log("ncols = " + this.currentColCount)
-            for (var i = 0; i < this.currentColCount; i++) {
-                $(this.container).append('<div class="grid-column"></div>')
-            }
+    relayoutColumns() {
+        this.currentColCount = this.desiredColCount()
+        if (DEBUG) console.log("ncols = " + this.currentColCount)
+        for (var i = 0; i < this.currentColCount; i++) {
+            $(this.container).append('<div class="grid-column"></div>')
         }
+    }
 
+    append(noteDiv) {
         // find column with most free space at bottom
         var i = 0
         var minHeight = -1
