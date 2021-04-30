@@ -1,6 +1,5 @@
 const async = require("async");
 const yargs = require('yargs');
-const assert = require('assert');
 const fs = require('fs');
 const got = require('got');
 const jsdom = require("jsdom");
@@ -26,7 +25,7 @@ const argv = yargs
     description: 'increment all ports by this number',
     type: 'number',
 })
-.default('portinc', 0)
+.default('portinc', 7)
 .help()
 .alias('help', 'h')
 .argv;
@@ -35,9 +34,10 @@ if (argv.portinc) {
     argv.serverport += argv.portinc
 }
 
+const rootdir = path.dirname(__dirname)
 const serverUrl= `http://${argv.servername}:${argv.serverport}/`;
-const testrepo = path.join(__dirname, "build", "testrepo")
-const solrPath = path.join(__dirname, "solr")
+const testrepo = path.join(rootdir, "build", "testrepo")
+const solrPath = path.join(rootdir, "solr")
 const serverLaunchCommand = `node server.js --portinc ${argv.portinc} -v --logging --reporoot "${testrepo}" --managesolr`;
 
 async function waitFor(testfunc, secs=10) {
@@ -64,11 +64,11 @@ function rm(_path) {
     rm(solrPath)
 
     // import takeout test dump
-    var takeoutdir = path.join(__dirname, "tests", "takeout")
-    child_process.execSync(`${serverLaunchCommand} --gktoimport ${takeoutdir}`, {stdio: 'inherit'})
+    var takeoutdir = path.join(rootdir, "tests", "takeout")
+    child_process.execSync(`${serverLaunchCommand} --gktoimport ${takeoutdir}`, {stdio: 'inherit', cwd: rootdir})
 
     // start server
-    var serverProcess = child_process.spawn(serverLaunchCommand, {stdio: 'inherit', shell: true})
+    var serverProcess = child_process.spawn(serverLaunchCommand, {stdio: 'inherit', shell: true, cwd: rootdir})
 
     // wait (allow 15 mins for download)
     await waitOn({resources: [serverUrl], timeout: 900 * 1000})

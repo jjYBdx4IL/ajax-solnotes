@@ -5,6 +5,7 @@
 
 * All working.
 * Simple Google Keep Takeout import mechanism.
+* `export.js` exports notes tagged with ",PUBLISH:CATEGORY:$catname" on the last line as markdown (ie. for publishing via [Hugo](https://gohugo.io/)). allowing you to instantly publish selected notes.
 * No authorization mechanism. Intended for non-public, private use behind a firewall. Not multi-user friendly because there is currently no mechanism to coordinate concurrent edits.
 * Minor UI tweaks might be a good idea [tm].
 
@@ -94,9 +95,3 @@
 * `tsconfig.json` is there to enable type checking for JavaScript (works in VSCode). There is no intention to switch to TypeScript. Development cycles probably would be even faster using [GWT](http://www.gwtproject.org/). The same applies to `lib.d.ts`. It's essentially a better alternative to `//@ts-ignore`. In the optimal case, `npm i @types/<pkgname> --save-dev` is available.
 * `__env_(prod|dev).js` contains the environment definitions. Beware that `DEBUG` and `PROD` variable ininitializations for `--prod` might be fake because they are overwritten in `uglify.js` to force the dead code elimination.
 
-## Potential Further Development Angles
-
-* Public use. Needed: authorization, either for both backends (solr+nodejs), or add a proxy handler for solr to nodejs and keep solr private.
-* Team support: handle concurrent edits somehow.
-* Potential performance improvement for larger installations: use solr for storage and add multi-tenancy. The latter is a bit useless because an alternative to Google Keep should not do the same as Google: run many users through the same company/server.
-* Google Keep data import.

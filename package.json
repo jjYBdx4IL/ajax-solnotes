@@ -46,7 +46,7 @@
     "uglifycss": "^0.0.29"
   },
   "scripts": {
-    "test": "node test.js --portinc 7",
+    "test": "node run_all_tests.js",
     "dev": "nodemon -w server.js server.js -- --skipimport --logging --livereload --managesolr --portinc 6 -v",
     "qa": "node server.js --prod --logging --managesolr --portinc 6 -v",
     "prod": "node server.js --prod",
