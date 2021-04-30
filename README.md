@@ -67,7 +67,7 @@
   * If all went right, the frontend should be accessible at http://localhost:3000 now.
   * Use the `--reporoot` option to specify a custom notes repository directory. By default, `repo/` at the server.js location will be used.
 * [Solr 8](https://solr.apache.org/downloads.html):
-  * The `--managesolr` serer.js flag performs all of the following for you. It will make the server manage its own Solr instance in `solr/`.
+  * The `--managesolr` server.js flag performs all of the following for you. It will make the server manage its own Solr instance in `solr/`. Please note that this option uses special capabilities of the OpenJDK *v12+* JVM to reduce the memory footprint of the Solr instance dramatically and is therefore not compatible with earlier releases.
   * Remove `X-Content-Type-Options` section from jetty.xml (but be aware of the consequences depending on your use case)
   * `solr[.cmd] start`
   * `solr[.cmd] create_core -c notes`
