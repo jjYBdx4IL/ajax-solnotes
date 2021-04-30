@@ -47,6 +47,9 @@ function init(solrPath=null, solrUrl=null, _verbose=false, cb) {
     verbose = _verbose
     managedSolrClient = undefined
 
+    // this saves quite a bit of memory if using (open)java runtime 12+
+    managedSolrEnv.SOLR_JAVA_MEM="-Xms16m -Xmx512m -XX:G1PeriodicGCInterval=300000 -XX:MaxHeapFreeRatio=5 -XX:MinHeapFreeRatio=1"
+
     var execStack = []
     execStack.push(managedSolrAdjustEnv);
     execStack.push(managedSolrStop);
