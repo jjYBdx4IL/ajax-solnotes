@@ -41,6 +41,7 @@
     "jsdom": "^16.5.3",
     "livereload": "^0.9.3",
     "start-server-and-test": "^1.12.1",
+    "terminate": "^2.1.2",
     "uglify-js": "^3.13.4",
     "uglifycss": "^0.0.29"
   },

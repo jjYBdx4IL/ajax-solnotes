@@ -211,13 +211,13 @@ function managedSolrPostInstall(cb) {
 
 function managedSolrStart(cb) {
     console.log("Starting Solr...")
-    var cmd = `${managedSolrCmdScript} start -p ${managedSolrUrl.port} -h ${managedSolrUrl.hostname}`
+    var cmd = `${managedSolrCmdScript} start -f -p ${managedSolrUrl.port} -h ${managedSolrUrl.hostname}`
     if (verbose) {
         console.log("executing command: " + cmd)
     }
     // on windows the solr start command does not properly detach, so we have to keep the process attached
     // or kill the server instantly
-    child_process.exec(cmd, {cwd: managedSolrBinPath, env: managedSolrEnv});
+    child_process.spawn(cmd, {cwd: managedSolrBinPath, env: managedSolrEnv, stdio: 'inherit', shell: true});
     waitOn({resources: [getRootUrl()], timeout: 30000}).then(function() {
         cb()
     }).catch(function(err) {

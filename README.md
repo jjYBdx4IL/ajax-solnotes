@@ -85,7 +85,7 @@
 ## Continuous Integration
 
 * See Github workflow.
-* `npm run ci` (needs a running `notes` core -- see *Installation*)
+* `npm run test`
 
 ## Development
 
@@ -100,7 +100,3 @@
 * Team support: handle concurrent edits somehow.
 * Potential performance improvement for larger installations: use solr for storage and add multi-tenancy. The latter is a bit useless because an alternative to Google Keep should not do the same as Google: run many users through the same company/server.
 * Google Keep data import.
-
-## Bugs
-
-Yes.

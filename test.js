@@ -70,8 +70,8 @@ function rm(_path) {
     // start server
     var serverProcess = child_process.spawn(serverLaunchCommand, {stdio: 'inherit', shell: true})
 
-    // wait
-    await waitOn({resources: [serverUrl], timeout: 30000})
+    // wait (allow 15 mins for download)
+    await waitOn({resources: [serverUrl], timeout: 900 * 1000})
 
     //@ts-ignore
     const response = await got(serverUrl, {});
@@ -96,7 +96,8 @@ function rm(_path) {
             && content.includes("ATTACHMENT:")
             && content.includes(".jpeg")
     });
-    serverProcess.kill('SIGKILL')
+
+    await require('terminate')(serverProcess.pid);
     console.log("done")
     dom.window.close()
 })();
