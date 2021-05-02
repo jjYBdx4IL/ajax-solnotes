@@ -5,4 +5,4 @@ test title 1
 a testvalue_xyz b
 c
 
-,PUBLISH:CATEGORY:catincl
+,PUBLISH:CATEGORY:catincl,tag1,tag2,tag3

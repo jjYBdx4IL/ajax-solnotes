@@ -27,7 +27,7 @@ function recreate(_path) {
 
     var filelist = glob.sync('**', {cwd: exportroot, follow: false, nodir: true});
 
-    assert(filelist.length == 4)
+    assert.strictEqual(filelist.length, 4)
 
     console.log("done")
     
