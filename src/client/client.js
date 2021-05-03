@@ -3,7 +3,7 @@
 $(function () {
     var noteEditor = new NoteEditor();
     var resultWidget = new ResultWidget("#docs", noteEditor);
-    var liveSearchWidget = new LiveSearchWidget("#search");
+    var liveSearchWidget = new LiveSearchWidget("#query");
     var lsClient = new LiveSearchClient(liveSearchWidget, resultWidget);
     lsClient.setRowsPerRequest(20);
     lsClient.updateResults();

@@ -23,9 +23,8 @@ const ResultWidget = class extends Widget {
      * @param {JQuery.ClickEvent} evt
      */
     onClick(evt) {
-        // direct clicks on 'links' have priority
-        if ($(evt.target).hasClass("link")) {
-            window.open($(evt.target).text(), '_blank').focus();
+        // ignore direct link clicks
+        if ($(evt.target).is("a")) {
             return
         }
         // else open the note editor
@@ -112,11 +111,10 @@ const ResultWidget = class extends Widget {
     template(noteText) {
         var snippet = '';
         if (noteText.length > this.maxPreviewLength) {
-            snippet = urlify($("<div>").text(noteText.substring(0, this.maxPreviewLength) + " ...").html());
+            snippet = this.noteEditor.md.render(noteText.substring(0, this.maxPreviewLength) + " ...")
         } else {
-            snippet = urlify($("<div>").text(noteText).html());
+            snippet = this.noteEditor.md.render(noteText)
         }
-        snippet = snippet.replaceAll(/\r?\n/g, "<br>");
-        return '<div class="grid-item"><div class="grid-item-textcontent">' + snippet + '</div></div>';
+        return '<div class="grid-item"><div class="grid-item-textcontent render">' + snippet + '</div></div>';
     }
 };

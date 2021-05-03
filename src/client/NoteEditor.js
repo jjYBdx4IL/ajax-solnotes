@@ -10,6 +10,7 @@ const NoteEditor = class {
     xhrSaveRequest = null;
     editNoteId = '';
     createNoteSessionId = '';
+    md = undefined // markdown-it
     
     /** @type {LiveSearchClient} */
     liveSearchClient = undefined;
@@ -18,10 +19,10 @@ const NoteEditor = class {
     /** @type {JQuery<HTMLElement>} */
     textContentEl = undefined
     /** @type {string} to check whether editor is dirty */
-    initialHtmlContent = undefined
+    initialContent = undefined
 
     isDirty = function() {
-        return this.textContentEl.html() != this.initialHtmlContent
+        return this.textContentEl.val() != this.initialContent
     }
 
     /** @param {JQuery.ClickEvent} evt */
@@ -30,13 +31,17 @@ const NoteEditor = class {
             window.open($(evt.target).text(), '_blank').focus();
         }
     }
+
+    hintShown = false
     /** @param {HTMLElement} el */
     onInput(el) {
         // hide background label/hint?
-        if (this.textContentEl.html().length) {
+        if (this.hintShown && ("" + this.textContentEl.val()).length) {
             $(".editbglabel").css({ visibility: "hidden" })
-            $(el).off('input')
+            this.hintShown = false
         }
+
+        this.debouncedRender()
     }
 
     afterOpen() {
@@ -48,15 +53,21 @@ const NoteEditor = class {
         $("#editor").css({ visibility: "visible" });
         $("#editor .textcontent").trigger("focus");
 
-        this.initialHtmlContent = this.textContentEl.html()
+        this.initialContent = "" + this.textContentEl.val()
 
         // show background label/hint ?
-        if (this.textContentEl.html().length) {
+        if (("" + this.textContentEl.val()).length) {
             $(".editbglabel").css({ visibility: "hidden" });
+            this.hintShown = false
         } else {
             $(".editbglabel").css({ visibility: "visible" });
-            this.textContentEl.on('input', function () { self.onInput(this) });
+            this.hintShown = true
         }
+
+        this.textContentEl.on('input', function () { self.onInput(this) });
+
+        // initial render
+        this.render()
     }
 
     afterClose() {
@@ -65,7 +76,7 @@ const NoteEditor = class {
         this.editNoteId = ''
         this.createNoteSessionId = ''
         this.textContentEl.html("")
-        this.initialHtmlContent = undefined
+        this.initialContent = undefined
 
         $("#query").attr("tabindex", 0);
         $("#query").trigger("focus"); // this pushed the result overview to the top atm, the query part should have static positioning (TODO)
@@ -74,27 +85,70 @@ const NoteEditor = class {
         $(".editbglabel").css({ visibility: "hidden" });
     }
 
+    render() {
+        $("#editor .render").html(this.md.render("" + this.textContentEl.val()))
+    }
+
+    debouncedRender = _.debounce(function() {
+        if (this.isOpen()) {
+            this.render()
+        }
+    }, 300)
+
+    setupMarkdownIt() {
+        this.md = window.markdownit({
+            linkify: true,
+            breaks: true,
+            highlight: function (str, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                  try {
+                    return hljs.highlight(str, { language: lang }).value;
+                  } catch (__) {}
+                }
+            
+                return ''; // use external default escaping
+              }
+        });
+        this.md.linkify.set({ fuzzyEmail: false }); // disables converting email to link
+
+        // https://github.com/markdown-it/markdown-it/blob/master/docs/architecture.md#renderer        
+        var defaultRender = this.md.renderer.rules.link_open || function(tokens, idx, options, env, self) {
+            return self.renderToken(tokens, idx, options);
+        };
+        this.md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+            tokens[idx].attrPush(['target', '_blank']);
+            return defaultRender(tokens, idx, options, env, self);
+        };
+
+        // preserve empty lines
+        // https://github.com/markdown-it/markdown-it/issues/211
+        const defaultParagraphRenderer = this.md.renderer.rules.paragraph_open || ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options));
+        this.md.renderer.rules.paragraph_open = function (tokens, idx, options, env, self) {
+          let result = '';
+          if (idx > 1) {
+            const inline = tokens[idx - 2];
+            const paragraph = tokens[idx];
+            if (inline.type === 'inline' && inline.map && inline.map[1] && paragraph.map && paragraph.map[0]) {
+              const diff = paragraph.map[0] - inline.map[1];
+              if (diff > 0) {
+                result = '<br>'.repeat(diff);
+              }
+            }
+          }
+          return result + defaultParagraphRenderer(tokens, idx, options, env, self);
+        };        
+    }
+
     init() {
         var self = this;
+        this.setupMarkdownIt()
         this.textContentEl = $("#editor .textcontent")
         this.textContentEl.on('click', function (evt) { self.onClick(evt); });
 
-        // paste as plain text only
-        $("[contenteditable]").each((i,el) => el.addEventListener("paste", function(e) {
-            e.preventDefault();
-            document.execCommand("insertHTML", false, self.cvtToEditorHtml(e.clipboardData.getData('text/plain')));
-        }));
-
         document.addEventListener('keydown', event => {
-            // prevent browsers from inserting divs into contenteditable div
-            // (otherwise we have a hard time to condense the html down into properly formatted plain text)
-            if (event.key === 'Enter') {
-                document.execCommand('insertLineBreak')
-                event.preventDefault()
-            }
             // Quick toggle between "create note (modal editor UI)" and search UI.
             // Will save changes when leaving the editor.
-            else if (event.key == "Escape") {
+            if (event.key == "Escape") {
                 if (self.isOpen()) {
                     self.saveNote()
                 } else {
@@ -116,29 +170,8 @@ const NoteEditor = class {
         });
     }
 
-    /** @param {string} text  @returns {string} */
-    cvtToEditorHtml(text) {
-        if(DEBUG) console.log("cvtToEditorHtml input: " + text)
-        text = he.encode(text)
-        if(DEBUG) console.log("cvtToEditorHtml after he.encode: " + text)
-        var val = urlify(text).replace(/\r?\n/gs, '<br>')
-        if(DEBUG) console.log("cvtToEditorHtml output: " + val)
-        return val
-    }
-
-    /** @param {string} htmlNote  @returns {string} */
-    cvtToPlainText(htmlNote) {
-        var text = deurlify(htmlNote).replaceAll(/<br>/g, '\n');
-        text = he.decode(text);
-        if (text == '') {
-            text += "\n"
-        }
-        if (DEBUG) console.log("cvtToPlainText result: " + text)
-        return text;
-    }
-
     isNoteEmpty() {
-        return !$.trim(this.textContentEl.text()).length
+        return !$.trim("" + this.textContentEl.val()).length
     }
 
     /** @returns {void} */
@@ -150,7 +183,7 @@ const NoteEditor = class {
             this.afterClose()
             return
         }
-        var plainText = this.cvtToPlainText(this.textContentEl.html());
+        var plainText = this.textContentEl.val();
         if (plainText === null) {
             this.statusDisplay.updateStatus("conversion to plain text format failed");
             return;
@@ -182,9 +215,9 @@ const NoteEditor = class {
         });
         this.xhrSaveRequest.always(function () {
             self.xhrSaveRequest = undefined
-            self.textContentEl.attr('contenteditable', 'true')
+            self.textContentEl.removeAttr('readonly')
         });
-        self.textContentEl.attr('contenteditable', 'false')
+        self.textContentEl.attr('readonly', 'readonly')
     }
     onSaveSuccess() {
         if (DEBUG) console.log("saved");
@@ -223,13 +256,12 @@ const NoteEditor = class {
                 this.statusDisplay.updateStatus(res.error);
                 return;
             }
-            this.textContentEl.html(this.cvtToEditorHtml(res.note.text));
+            this.textContentEl.val(res.note.text);
             this.createNoteSessionId = '';
             $("#delete").show();
         } else {
-            this.textContentEl.html("");
+            this.textContentEl.val("");
             this.createNoteSessionId = makeid(20);
-            $(".editbglabel").css({ visibility: "visible" });
             $("#delete").hide();
         }
         this.editNoteId = noteId;

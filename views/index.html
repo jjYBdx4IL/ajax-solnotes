@@ -10,8 +10,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"
+    integrity="sha256-qXBd/EfAdjOA2FGrGAG+b3YBn2tn5A6bhz+LSgYD96k=" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/he/1.2.0/he.min.js"
     integrity="sha512-PEsccDx9jqX6Dh4wZDCnWMaIO3gAaU0j46W//sSqQhUQxky6/eHZyeB3NrXD2xsyugAKd4KPiDANkcuoEa2JuA=="
+    crossorigin="anonymous"></script>
+  <style>
+    @import "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/a11y-light.min.css" screen;
+    @import "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/a11y-dark.min.css" screen and (prefers-color-scheme: dark);
+  </style>    
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/12.0.6/markdown-it.min.js"
+    integrity="sha512-7U8vY7c6UQpBNQOnBg3xKX502NAckvk70H1nWvh6W7izA489jEz+RCN3ntT1VMdXewaSKkOrEBegp/h6SPXrjw=="
     crossorigin="anonymous"></script>
   {% if prod %}
   <script src="__app__.js"></script>
@@ -37,25 +47,22 @@
 
   <div id="wrap">
     <div id="header">
-      <h1>AJAX SolNotes</h1>
-      <ul id="search">
-        <input type="text" id="query" name="query" autocomplete="off" autofocus tabindex="0" spellcheck="false">
-        <div id="addnote" class="material-icons">add_circle_outline</div>
-      </ul>
+      <div><h1>AJAX SolNotes</h1></div>
+      <div><input type="text" id="query" name="query" autocomplete="off" autofocus tabindex="0" spellcheck="false"></div>
+      <div><div id="addnote" class="material-icons">add_circle_outline</div></div>
     </div>
-    <div class="clear"></div>
   </div>
 
   <div id="docs" class="grid"></div>
 
-
-  <div class="modal">
-  </div>
-
+  <div class="modal"></div>
 
   <div id="editor" role="dialog" aria-modal="true" class="colorscheme">
     <div class="editbglabel">Take a note...</div>
-    <div class="textcontent" contenteditable="true" aria-label="Take a note..." spellcheck="false" tabindex="0"></div>
+    <div class="editrow">
+      <textarea class="textcontent" aria-label="Take a note..." spellcheck="true" tabindex="0"></textarea>
+      <div class="render"></div>
+    </div>
     <div class="footer">
       <div id="delete" class="button">Delete</div>
       <div id="cancel" class="button">Cancel</div>
@@ -66,5 +73,4 @@
   <div id="status"></div>
 
 </body>
-
 </html>

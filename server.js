@@ -298,7 +298,8 @@ execStack.push(function (cb) {
     app = express()
     nunjucksEnv = nunjucks.configure('views', {
         autoescape: true,
-        express: app
+        express: app,
+        noCache: !argv.prod
     });
 
     nunjucksEnv.addGlobal('prod', argv.prod);

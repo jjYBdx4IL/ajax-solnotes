@@ -14,7 +14,7 @@ const LiveSearchWidget = class extends Widget {
     /** @type {LiveSearchClient} */
     lsClient = undefined;
 
-    /** @param {HTMLInputElement} el */
+    /** @param {HTMLElement} el */
     onInput(el) {
         // convert search expression to solr nota
         var values = $.trim("" + $(el).val()).split(/\s+/);
@@ -52,7 +52,8 @@ const LiveSearchWidget = class extends Widget {
 
     attach() {
         var self = this;
-        $(this.container).find('input').on('input', function () {
+        if (DEBUG) console.log("attaching LiveSearchWidget to: " + this.container)
+        $(this.container).on('input', function () {
             self.onInput(this);
         });
     }
