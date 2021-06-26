@@ -95,3 +95,7 @@
 * `tsconfig.json` is there to enable type checking for JavaScript (works in VSCode). There is no intention to switch to TypeScript. Development cycles probably would be even faster using [GWT](http://www.gwtproject.org/). The same applies to `lib.d.ts`. It's essentially a better alternative to `//@ts-ignore`. In the optimal case, `npm i @types/<pkgname> --save-dev` is available.
 * `__env_(prod|dev).js` contains the environment definitions. Beware that `DEBUG` and `PROD` variable ininitializations for `--prod` might be fake because they are overwritten in `uglify.js` to force the dead code elimination.
 
+
+
+--
+devel/js/ajax-solnotes@7891

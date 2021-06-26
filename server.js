@@ -401,7 +401,9 @@ execStack.push(function (cb) {
     }
 
     // http://expressjs.com/en/api.html
-    app.use(express.json());
+    // https://stackoverflow.com/questions/19917401/error-request-entity-too-large
+    app.use(express.json({limit: '50mb'}));
+    app.use(express.urlencoded({limit: '50mb'}));
     app.param('noteId', function (req, res, next, noteId) {
         if (!noteStore.isValidNoteIdFormat(noteId)) {
             res.status(500).end();
