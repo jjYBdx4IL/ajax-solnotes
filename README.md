@@ -9,6 +9,17 @@
 * No authorization mechanism. Intended for non-public, private use behind a firewall. Not multi-user friendly because there is currently no mechanism to coordinate concurrent edits.
 * Minor UI tweaks might be a good idea [tm].
 
+## Quick setup (Windows)
+
+* Install cygwin+screen.
+* Install java 16+ JRE (!! JDK is missing registry entries) (https://www.azul.com/downloads/?version=java-17-lts&os=windows&architecture=x86-64-bit&package=jre).
+* Install Node.js 16.
+* npm install -g nodemon
+* npm install
+* npm run build
+* adjust screen.exe path in ajax-solnotes-autostart.sh
+* link ajax-solnotes-autostart.cmd into autostart folder (win-r: shell:startup)
+
 ## Overview
 
 * Intended as an alternative to Google Keep, one that can be run locally and integrates nicely with version control systems (ie. operates only on simple text files, which can then be exported, converted, grepped at will).
@@ -98,4 +109,4 @@
 
 
 --
-devel/js/ajax-solnotes@7954
+devel/js/ajax-solnotes@7956
