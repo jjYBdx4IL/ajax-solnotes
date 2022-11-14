@@ -19,6 +19,7 @@
 * npm run build
 * adjust screen.exe path in ajax-solnotes-autostart.sh
 * link ajax-solnotes-autostart.cmd into autostart folder (win-r: shell:startup)
+* set env var NOTESREPO to your preferred notes data directory, ie. `NOTESREPO=%USERPROFILE%\Documents\notes`
 
 ## Overview
 
@@ -109,4 +110,4 @@
 
 
 --
-devel/js/ajax-solnotes@7956
+devel/js/ajax-solnotes@8035
